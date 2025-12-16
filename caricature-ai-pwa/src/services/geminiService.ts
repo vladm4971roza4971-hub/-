@@ -43,11 +43,30 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         return res.ok;
     }
     else if (settings.provider === 'huggingface') {
-        // Test with a simple model status check
-        const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
-            headers: { 'Authorization': `Bearer ${settings.apiKey}` }
-        });
-        return res.ok || res.status === 503; // 503 means model loading, key is valid
+        // Method 1: Check whoami (Standard check for valid token)
+        try {
+            const res = await fetch('https://huggingface.co/api/whoami-v2', {
+                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+            });
+            if (res.ok) return true;
+        } catch (e) {
+            console.warn("HF whoami check failed, trying fallback", e);
+        }
+
+        // Method 2: Check Model Status (Fallback)
+        // Note: Fine-grained tokens with ONLY 'Inference' permission might return 403 Forbidden for /status endpoint
+        // because they lack 'Read Data' permission. However, they are valid for inference.
+        // We only consider the key INVALID if we get 401 Unauthorized.
+        try {
+            const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
+                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+            });
+            if (res.status === 401) return false; // Invalid Key
+            return true; // 200 (OK), 503 (Loading), or 403 (Valid key, restricted scope)
+        } catch (e) {
+            console.error("HF status check failed", e);
+            return false;
+        }
     }
     return false;
   } catch (e) {
