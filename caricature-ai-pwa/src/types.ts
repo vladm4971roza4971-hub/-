@@ -108,6 +108,8 @@ export enum Tool {
 
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
+export type ImageSize = '512x512' | '768x768' | '1024x1024';
+
 export interface GeneratedImage {
   imageUrl: string;
   prompt: string;
