@@ -4,6 +4,7 @@ import { Button } from './components/Button';
 import { Spinner } from './components/Spinner';
 import { StyleSelector } from './components/StyleSelector';
 import { SaveModal } from './components/SaveModal';
+import { SettingsModal } from './components/SettingsModal';
 import { generateCaricature, fileToBase64 } from './services/geminiService';
 import { saveHistoryItem, getHistoryItems } from './services/dbService';
 
@@ -48,6 +49,8 @@ const App: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState({ brightness: 100, contrast: 100, saturation: 100 });
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState<string | null>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   
   // PWA Install State
@@ -69,10 +72,15 @@ const App: React.FC = () => {
     ? referenceImages.find(r => r.id === activeReferenceId)?.originalUrl || null 
     : originalImage;
 
-  // Load history on mount & Setup PWA
+  // Load history on mount & Setup PWA & API Key
   useEffect(() => {
-    const loadHistory = async () => {
+    const loadData = async () => {
       try {
+        // Load API Key
+        const savedKey = localStorage.getItem('user_api_key');
+        if (savedKey) setCustomApiKey(savedKey);
+
+        // Load History
         const localSaved = localStorage.getItem('caricature_history');
         if (localSaved) {
            const items: HistoryItem[] = JSON.parse(localSaved);
@@ -84,10 +92,10 @@ const App: React.FC = () => {
         const items = await getHistoryItems();
         setHistory(items);
       } catch (e) {
-        console.error("Failed to load history", e);
+        console.error("Failed to load data", e);
       }
     };
-    loadHistory();
+    loadData();
 
     // Listen for PWA install prompt (Android/Desktop)
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -123,6 +131,15 @@ const App: React.FC = () => {
         setInstallPrompt(null);
       }
     });
+  };
+
+  const handleApiKeyChange = (key: string | null) => {
+      setCustomApiKey(key);
+      if (key) {
+          localStorage.setItem('user_api_key', key);
+      } else {
+          localStorage.removeItem('user_api_key');
+      }
   };
 
   // --- Canvas Rendering Logic ---
@@ -176,7 +193,8 @@ const App: React.FC = () => {
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (activeTool === Tool.NONE) return;
-    if (e.cancelable) e.preventDefault(); // Prevent scroll on touch
+    // Prevent scroll ONLY if we are using a tool
+    if (e.cancelable) e.preventDefault(); 
     
     const coords = getCoords(e);
     if (!coords) return;
@@ -599,7 +617,15 @@ const App: React.FC = () => {
         }
       }
 
-      const resultUrl = await generateCaricature(mainInputBase64, selectedStyle, customPrompt, referenceImages, quality, mimeType);
+      const resultUrl = await generateCaricature(
+          mainInputBase64, 
+          selectedStyle, 
+          customPrompt, 
+          referenceImages, 
+          quality, 
+          mimeType,
+          customApiKey // Pass custom key
+      );
       
       let finalResultUrl = resultUrl;
 
@@ -743,6 +769,13 @@ const App: React.FC = () => {
         onClose={() => setIsSaveModalOpen(false)} 
         onSave={handleSaveAs}
       />
+      
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onApiKeyChange={handleApiKeyChange}
+        currentKey={customApiKey}
+      />
 
       {/* Full Screen Image Modal */}
       {fullScreenImage && (
@@ -795,6 +828,13 @@ const App: React.FC = () => {
             <h1 className="text-xl font-comic font-bold text-gray-800">Карикатура AI</h1>
           </div>
           <div className="flex items-center gap-2">
+             <button
+               onClick={() => setIsSettingsOpen(true)}
+               className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+               title="Настройки"
+             >
+                ⚙️
+             </button>
              {installPrompt && (
                <button 
                  onClick={handleInstallClick}
@@ -954,7 +994,7 @@ const App: React.FC = () => {
 
                 {/* Image Container */}
                 <div 
-                    className={`relative w-full rounded-xl overflow-hidden bg-[url('https://t3.ftcdn.net/jpg/03/76/74/78/360_F_376747823_L8il80K6c0B8K47eqV8a6q8b75k4b8h0.jpg')] bg-repeat border-2 border-dashed border-gray-300 touch-none shadow-inner`}
+                    className={`relative w-full rounded-xl overflow-hidden bg-[url('https://t3.ftcdn.net/jpg/03/76/74/78/360_F_376747823_L8il80K6c0B8K47eqV8a6q8b75k4b8h0.jpg')] bg-repeat border-2 border-dashed border-gray-300 shadow-inner max-h-[60vh] lg:max-h-none ${activeTool !== Tool.NONE ? 'touch-none' : ''}`}
                     style={{ backgroundSize: '16px 16px' }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
