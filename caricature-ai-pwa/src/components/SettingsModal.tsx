@@ -128,7 +128,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                       <p className="text-xs text-orange-500 font-bold mt-1">⚠️ Работает только по тексту (фото игнорируется)</p>
                   )}
                   {provider === 'huggingface' && (
-                      <p className="text-xs text-blue-500 font-bold mt-1">ℹ️ Использует InstructPix2Pix для фото</p>
+                      <div className="mt-2 bg-blue-50 p-2 rounded-lg border border-blue-100">
+                        <p className="text-[10px] text-blue-600 font-bold mb-1">Как создать токен:</p>
+                        <p className="text-[10px] text-blue-500 leading-tight">
+                          1. Выберите тип <b>Fine-grained</b><br/>
+                          2. В разделе <b>User Permissions</b> найдите <b>Inference</b><br/>
+                          3. Отметьте галочку <b className="text-blue-700">Make calls to Inference Providers</b>
+                        </p>
+                      </div>
                   )}
               </div>
           </div>
