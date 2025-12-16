@@ -145,10 +145,18 @@ const generateWithGemini = async (
             if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
             throw new Error("No image in Gemini response");
         } catch (err: any) {
-            if (err.message.includes('429') && retries < 2) {
-                retries++;
-                await wait(2000 * retries);
-                continue;
+            // Enhanced 429 Quota Error Handling
+            const msg = err.message || JSON.stringify(err);
+            const isQuota = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded');
+
+            if (isQuota) {
+                if (retries < 2) {
+                    retries++;
+                    console.warn(`Quota exceeded. Retrying in ${2 * retries}s...`);
+                    await wait(2000 * retries);
+                    continue;
+                }
+                throw new Error("Лимит запросов Google Gemini исчерпан (429).\n\nСовет: Переключитесь на сервис 'Pollinations' в настройках (он бесплатный и безлимитный).");
             }
             throw err;
         }
