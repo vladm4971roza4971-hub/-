@@ -1,5 +1,5 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
-import { ArtStyle, Quality, ReferenceImage, AppSettings, AIProvider } from "../types";
+import { ArtStyle, Quality, ReferenceImage, AppSettings, ImageSize } from "../types";
 
 // Helper to convert File to Base64
 export const fileToBase64 = (file: File): Promise<string> => {
@@ -67,7 +67,8 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
     }
     else if (settings.provider === 'gemini') {
         const ai = new GoogleGenAI({ apiKey: settings.apiKey });
-        await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'hi' });
+        // Простой тест
+        await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'test' });
         return true;
     } 
     else if (settings.provider === 'openai') {
@@ -224,6 +225,17 @@ const getBasePrompt = (style: ArtStyle, qualityModifiers: string) => {
     }
 };
 
+const getFriendlyErrorMessage = (error: any): string => {
+  const msg = error.message || error.toString();
+  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Превышен лимит запросов Google. Попробуйте позже или смените ключ.";
+  if (msg.includes('401') || msg.includes('API key')) return "Неверный API ключ. Проверьте настройки.";
+  if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен. Проверьте права API ключа (GCP Project).";
+  if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Генерация заблокирована фильтром безопасности. Попробуйте другое фото или описание.";
+  if (msg.includes('503') || msg.includes('Overloaded')) return "Сервис перегружен. Попробуйте через минуту.";
+  if (msg.includes('finishReason')) return `Модель завершила работу с причиной: ${msg}`;
+  return `Произошла ошибка: ${msg.slice(0, 100)}...`;
+};
+
 // --- GEMINI HANDLER ---
 const generateWithGemini = async (
     apiKey: string,
@@ -232,6 +244,7 @@ const generateWithGemini = async (
     customPrompt: string,
     referenceImages: ReferenceImage[],
     quality: Quality,
+    imageSize: ImageSize,
     mimeType: string
 ) => {
     const ai = new GoogleGenAI({ apiKey });
@@ -249,40 +262,71 @@ const generateWithGemini = async (
         parts.push({ inlineData: { data: ref.croppedBase64 || ref.base64, mimeType: ref.mimeType } });
     });
 
+    // --- MODEL SELECTION LOGIC ---
+    // If the user requests 1K/Standard, use 'gemini-2.5-flash-image' which is faster and often has better quota/pricing.
+    // If the user requests 2K/4K/High, use 'gemini-3-pro-image-preview'.
+    const isHighRes = imageSize === '2K' || imageSize === '4K' || quality === 'High';
+    const modelName = isHighRes ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+    
+    // Config construction: Flash models do not support 'imageConfig' with explicit size/ratio in the same way Pro does,
+    // or sometimes reject it. Pro models require it for 2k/4k.
+    const generationConfig: any = {
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+    };
+
+    if (isHighRes) {
+        generationConfig.imageConfig = {
+            imageSize: imageSize, 
+            aspectRatio: "1:1"
+        };
+    } else {
+        // For Flash, we rely on default square output.
+        // We can optionally pass 'aspectRatio: "1:1"' if the SDK supports it for Flash, 
+        // but to be safe and avoid "invalid argument" errors on Flash, we omit explicit imageConfig for 1K unless strictly needed.
+        // Documentation says "Generate images using gemini-2.5-flash-image by default".
+        generationConfig.imageConfig = { aspectRatio: "1:1" };
+    }
+
     let retries = 0;
     while (true) {
         try {
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image',
+                model: modelName,
                 contents: { parts },
-                config: {
-                    safetySettings: [
-                        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                    ]
-                }
+                config: generationConfig
             });
+            
             const candidate = response.candidates?.[0];
-            const part = candidate?.content?.parts?.[0];
             
-            if (part?.inlineData?.data) {
-                return `data:image/png;base64,${part.inlineData.data}`;
+            // Check refusal/finish reason
+            if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+                 throw new Error(`Finish Reason: ${candidate.finishReason}`);
             }
 
-            // If no image, check for text (refusal message)
-            if (part?.text) {
-                 throw new Error(`Gemini отклонил запрос: ${part.text}`);
-            }
-            
-            if (candidate?.finishReason) {
-                throw new Error(`Gemini завершил запрос со статусом: ${candidate.finishReason}. Попробуйте изменить описание или фото.`);
+            // Iterate through parts to find the image (as per spec)
+            if (candidate?.content?.parts) {
+                for (const part of candidate.content.parts) {
+                    if (part.inlineData?.data) {
+                        return `data:image/png;base64,${part.inlineData.data}`;
+                    }
+                }
             }
 
-            throw new Error("Gemini не вернул изображение. Попробуйте снова.");
+            // If no image found, check for text (refusal/error message from model)
+            const textPart = candidate?.content?.parts?.find(p => p.text);
+            if (textPart?.text) {
+                 throw new Error(`Gemini Message: ${textPart.text}`);
+            }
+
+            throw new Error("Gemini не вернул изображение.");
+
         } catch (err: any) {
-            // Enhanced 429 Quota Error Handling
+            // Enhanced 429 Quota Error Handling logic inside loop
             const msg = err.message || JSON.stringify(err);
             const isQuota = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded');
 
@@ -293,8 +337,8 @@ const generateWithGemini = async (
                     await wait(2000 * retries);
                     continue;
                 }
-                throw new Error("Лимит запросов Google Gemini исчерпан (429).\n\nСовет: Переключитесь на сервис 'Hugging Face' (бесплатно, с токеном) или 'Pollinations' (без фото) в настройках.");
             }
+            // Propagate error to be caught by main handler which uses friendly message map
             throw err;
         }
     }
@@ -477,12 +521,18 @@ export const generateCaricature = async (
   referenceImages: ReferenceImage[] = [],
   quality: Quality = 'Standard',
   mimeType: string = 'image/jpeg',
-  settings?: AppSettings | null
+  settings?: AppSettings | null,
+  imageSize: ImageSize = '1K'
 ): Promise<string> => {
   
   // Default to Gemini from Env if no settings provided
   if (!settings && process.env.API_KEY) {
-      return generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, quality, mimeType);
+      // Use friendly error wrapper for default path too
+      try {
+        return await generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, quality, imageSize, mimeType);
+      } catch (e) {
+        throw new Error(getFriendlyErrorMessage(e));
+      }
   }
 
   // Pollinations doesn't need key, BUT it ignores image
@@ -496,7 +546,7 @@ export const generateCaricature = async (
 
   try {
       if (settings.provider === 'gemini') {
-          return await generateWithGemini(settings.apiKey, mainImageBase64, style, customPrompt, referenceImages, quality, mimeType);
+          return await generateWithGemini(settings.apiKey, mainImageBase64, style, customPrompt, referenceImages, quality, imageSize, mimeType);
       } else if (settings.provider === 'stability') {
           return await generateWithStability(settings.apiKey, mainImageBase64, style, customPrompt, settings.baseUrl);
       } else if (settings.provider === 'openai') {
@@ -507,6 +557,8 @@ export const generateCaricature = async (
       throw new Error("Неизвестный провайдер");
   } catch (error: any) {
       console.error("Generation Error:", error);
-      throw new Error(error.message || "Ошибка генерации изображения");
+      // Use friendly error messages
+      const friendlyMsg = getFriendlyErrorMessage(error);
+      throw new Error(friendlyMsg);
   }
 };
