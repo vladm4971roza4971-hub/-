@@ -1,6 +1,6 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { ArtStyle } from "../types";
-import type { Quality, ReferenceImage, AppSettings, ImageSize } from "../types";
+import type { Quality, ReferenceImage, AppSettings } from "../types";
 
 // Helper to convert File to Base64
 export const fileToBase64 = (file: File): Promise<string> => {
@@ -67,9 +67,12 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         return true; // No key needed
     }
     else if (settings.provider === 'gemini') {
+        // Validate Standard Key
         const ai = new GoogleGenAI({ apiKey: settings.apiKey });
-        // Простой тест
         await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'test' });
+
+        // Optionally validate Pro key if present, but failure there shouldn't block the whole app,
+        // just the pro features. For simple validation we check main key.
         return true;
     } 
     else if (settings.provider === 'openai') {
@@ -87,7 +90,6 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         return res.ok;
     }
     else if (settings.provider === 'huggingface') {
-        // Method 1: Check whoami (Standard check for valid token)
         try {
             const res = await fetch('https://huggingface.co/api/whoami-v2', {
                 headers: { 'Authorization': `Bearer ${settings.apiKey}` }
@@ -96,18 +98,14 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         } catch (e) {
             console.warn("HF whoami check failed, trying fallback", e);
         }
-
-        // Method 2: Check Model Status (Fallback)
         try {
             const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
                 headers: { 'Authorization': `Bearer ${settings.apiKey}` }
             });
-            if (res.status === 401) return false; // Invalid Key
+            if (res.status === 401) return false;
             return true; 
         } catch (e) {
             console.error("HF status check failed", e);
-            // If network fails entirely, assume key might be ok but net is down, 
-            // but for validation purposes we return false to force check.
             return false;
         }
     }
@@ -245,11 +243,17 @@ const generateWithGemini = async (
     customPrompt: string,
     referenceImages: ReferenceImage[],
     quality: Quality,
-    imageSize: ImageSize,
     mimeType: string
 ) => {
     const ai = new GoogleGenAI({ apiKey });
-    const qualityModifiers = quality === 'High' ? "high quality, 8k resolution, highly detailed" : "standard quality";
+    const isHighRes = quality === 'High';
+    
+    // Model Selection logic based on quality
+    // 'High' uses gemini-3-pro-image-preview (Better adherence, higher res default)
+    // 'Standard' uses gemini-2.5-flash-image (Faster, cheaper)
+    const modelName = isHighRes ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+    const qualityModifiers = isHighRes ? "high quality, 8k resolution, highly detailed" : "standard quality";
+    
     let prompt = getBasePrompt(style, qualityModifiers);
 
     if (referenceImages.length > 0) {
@@ -263,14 +267,6 @@ const generateWithGemini = async (
         parts.push({ inlineData: { data: ref.croppedBase64 || ref.base64, mimeType: ref.mimeType } });
     });
 
-    // --- MODEL SELECTION LOGIC ---
-    // If the user requests 1K/Standard, use 'gemini-2.5-flash-image' which is faster and often has better quota/pricing.
-    // If the user requests 2K/4K/High, use 'gemini-3-pro-image-preview'.
-    const isHighRes = imageSize === '2K' || imageSize === '4K' || quality === 'High';
-    const modelName = isHighRes ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-    
-    // Config construction: Flash models do not support 'imageConfig' with explicit size/ratio in the same way Pro does,
-    // or sometimes reject it. Pro models require it for 2k/4k.
     const generationConfig: any = {
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -280,16 +276,13 @@ const generateWithGemini = async (
         ]
     };
 
+    // Only apply explicit imageConfig if strictly necessary. 
+    // Flash models can be picky about this parameter, so we default to standard behavior unless Pro is used.
     if (isHighRes) {
         generationConfig.imageConfig = {
-            imageSize: imageSize, 
             aspectRatio: "1:1"
         };
     } else {
-        // For Flash, we rely on default square output.
-        // We can optionally pass 'aspectRatio: "1:1"' if the SDK supports it for Flash, 
-        // but to be safe and avoid "invalid argument" errors on Flash, we omit explicit imageConfig for 1K unless strictly needed.
-        // Documentation says "Generate images using gemini-2.5-flash-image by default".
         generationConfig.imageConfig = { aspectRatio: "1:1" };
     }
 
@@ -304,12 +297,10 @@ const generateWithGemini = async (
             
             const candidate = response.candidates?.[0];
             
-            // Check refusal/finish reason
             if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
                  throw new Error(`Finish Reason: ${candidate.finishReason}`);
             }
 
-            // Iterate through parts to find the image (as per spec)
             if (candidate?.content?.parts) {
                 for (const part of candidate.content.parts) {
                     if (part.inlineData?.data) {
@@ -318,7 +309,6 @@ const generateWithGemini = async (
                 }
             }
 
-            // If no image found, check for text (refusal/error message from model)
             const textPart = candidate?.content?.parts?.find(p => p.text);
             if (textPart?.text) {
                  throw new Error(`Gemini Message: ${textPart.text}`);
@@ -327,7 +317,6 @@ const generateWithGemini = async (
             throw new Error("Gemini не вернул изображение.");
 
         } catch (err: any) {
-            // Enhanced 429 Quota Error Handling logic inside loop
             const msg = err.message || JSON.stringify(err);
             const isQuota = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota exceeded');
 
@@ -339,7 +328,6 @@ const generateWithGemini = async (
                     continue;
                 }
             }
-            // Propagate error to be caught by main handler which uses friendly message map
             throw err;
         }
     }
@@ -354,19 +342,17 @@ const generateWithStability = async (
     baseUrl: string = 'https://api.stability.ai'
 ) => {
     const stylePrompt = getStylePrompt(style);
-    // PRIORITIZE USER PROMPT: Putting customPrompt first helps model adherence
     const finalPrompt = `${customPrompt ? customPrompt + ', ' : ''}(caricature:1.3), ${stylePrompt}`;
 
     const formData = new FormData();
     formData.append('init_image', new Blob([Buffer.from(mainImageBase64, 'base64')], { type: 'image/png' }));
     formData.append('text_prompts[0][text]', finalPrompt);
     formData.append('text_prompts[0][weight]', '1');
-    formData.append('image_strength', '0.35'); // How much to respect the original image
+    formData.append('image_strength', '0.35');
     formData.append('cfg_scale', '7');
     formData.append('samples', '1');
     formData.append('steps', '30');
 
-    // Standard endpoint: https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image
     const endpoint = `${baseUrl.replace(/\/$/, '')}/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image`;
 
     const response = await fetch(endpoint, {
@@ -395,7 +381,6 @@ const generateWithOpenAI = async (
     baseUrl: string = 'https://api.openai.com/v1'
 ) => {
     const stylePrompt = getStylePrompt(style);
-    // DALL-E 3 doesn't take input images, so we rely purely on the prompt description.
     const prompt = `A funny caricature in the style of ${stylePrompt}. ${customPrompt}`;
 
     const response = await fetch(`${baseUrl.replace(/\/$/, '')}/images/generations`, {
@@ -422,7 +407,7 @@ const generateWithOpenAI = async (
     return `data:image/png;base64,${data.data[0].b64_json}`;
 };
 
-// --- HUGGING FACE HANDLER (Text to Image OR Image to Image via InstructPix2Pix) ---
+// --- HUGGING FACE HANDLER ---
 const generateWithHuggingFace = async (
     apiKey: string,
     mainImageBase64: string,
@@ -431,19 +416,12 @@ const generateWithHuggingFace = async (
     mimeType: string
 ) => {
     const stylePrompt = getStylePrompt(style);
-
-    // CRITICAL: Resize image to max 450px to prevent "Failed to fetch" (Payload too large)
-    // The free inference API struggles with anything larger.
     const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 450);
-
-    // INSTRUCT PIX2PIX (Image Editing)
     const model = "timbrooks/instruct-pix2pix";
-    // Prioritize custom prompt instruction
     const prompt = `${customPrompt ? customPrompt + '. ' : ''}turn him into a funny caricature, ${stylePrompt} style.`;
     
-    // Construct JSON payload for HF Inference API
     const payload = {
-        inputs: resizedBase64, // Use the resized base64
+        inputs: resizedBase64,
         parameters: {
             prompt: prompt,
             num_inference_steps: 20,
@@ -466,7 +444,6 @@ const generateWithHuggingFace = async (
         if (!response.ok) {
             const err = await response.text();
             if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
-            // If still too large
             if (response.status === 413) throw new Error("Файл слишком большой для Hugging Face. Попробуйте обрезать его.");
             throw new Error(`Ошибка Hugging Face: ${response.status} - ${err.slice(0, 100)}`);
         }
@@ -479,7 +456,6 @@ const generateWithHuggingFace = async (
             reader.readAsDataURL(blob);
         });
     } catch (error: any) {
-        // Explicitly handle TypeError for network/fetch failures
         if (error.name === 'TypeError' || error.message.includes('fetch')) {
              throw new Error("Ошибка соединения с Hugging Face. \nВозможно, интернет-фильтр блокирует доступ или файл все еще велик.\nПопробуйте VPN или другой сервис в настройках.");
         }
@@ -487,19 +463,13 @@ const generateWithHuggingFace = async (
     }
 };
 
-// --- POLLINATIONS.AI HANDLER (Free) ---
+// --- POLLINATIONS.AI HANDLER ---
 const generateWithPollinations = async (
     style: ArtStyle,
     customPrompt: string
 ) => {
-    // Pollinations is Text-to-Image in this implementation
     const stylePrompt = getStylePrompt(style);
-    
-    // PRIORITIZE USER PROMPT: Put customPrompt at the very beginning. 
-    // This helps the model see the subject ("pike fish", etc) before "funny caricature".
     const prompt = encodeURIComponent(`${customPrompt ? customPrompt + ', ' : ''}funny caricature, ${stylePrompt}`);
-    
-    // Pollinations generates image via URL.
     const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
     
     const response = await fetch(url);
@@ -522,21 +492,17 @@ export const generateCaricature = async (
   referenceImages: ReferenceImage[] = [],
   quality: Quality = 'Standard',
   mimeType: string = 'image/jpeg',
-  settings?: AppSettings | null,
-  imageSize: ImageSize = '1K'
+  settings?: AppSettings | null
 ): Promise<string> => {
   
-  // Default to Gemini from Env if no settings provided
   if (!settings && process.env.API_KEY) {
-      // Use friendly error wrapper for default path too
       try {
-        return await generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, quality, imageSize, mimeType);
+        return await generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, quality, mimeType);
       } catch (e) {
         throw new Error(getFriendlyErrorMessage(e));
       }
   }
 
-  // Pollinations doesn't need key, BUT it ignores image
   if (settings?.provider === 'pollinations') {
       return await generateWithPollinations(style, customPrompt);
   }
@@ -547,7 +513,19 @@ export const generateCaricature = async (
 
   try {
       if (settings.provider === 'gemini') {
-          return await generateWithGemini(settings.apiKey, mainImageBase64, style, customPrompt, referenceImages, quality, imageSize, mimeType);
+          // KEY SELECTION LOGIC
+          // If High quality (Pro model) is requested, prefer the Pro key.
+          // If Pro key is not set, fallback to standard key.
+          let keyToUse = settings.apiKey;
+          if (quality === 'High' && settings.geminiProApiKey) {
+              keyToUse = settings.geminiProApiKey;
+          } else if (quality === 'High' && !settings.geminiProApiKey) {
+               // Optional: warn user or just proceed with standard key?
+               // We proceed with standard key, but it might fail or use standard quota.
+               // Or user might have a single paid key for everything.
+          }
+
+          return await generateWithGemini(keyToUse, mainImageBase64, style, customPrompt, referenceImages, quality, mimeType);
       } else if (settings.provider === 'stability') {
           return await generateWithStability(settings.apiKey, mainImageBase64, style, customPrompt, settings.baseUrl);
       } else if (settings.provider === 'openai') {
@@ -558,7 +536,6 @@ export const generateCaricature = async (
       throw new Error("Неизвестный провайдер");
   } catch (error: any) {
       console.error("Generation Error:", error);
-      // Use friendly error messages
       const friendlyMsg = getFriendlyErrorMessage(error);
       throw new Error(friendlyMsg);
   }
