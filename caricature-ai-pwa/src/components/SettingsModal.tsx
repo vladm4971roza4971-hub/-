@@ -78,7 +78,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           case 'openai': return { icon: '🧠', name: 'OpenAI DALL-E', desc: 'Мощный, но платный. Игнорирует фото (только текст).', hasFree: false, needsKey: true };
           case 'stability': return { icon: '🎨', name: 'Stability AI', desc: 'Отлично обрабатывает фото (Img2Img). Платный.', hasFree: false, needsKey: true };
           case 'huggingface': return { icon: '🤗', name: 'Hugging Face', desc: 'Бесплатный токен. Видит фото (InstructPix2Pix).', hasFree: true, needsKey: true };
-          case 'pollinations': return { icon: '🌸', name: 'Pollinations', desc: 'Бесплатно. Игнорирует фото (рисует с нуля по стилю).', hasFree: true, needsKey: false };
+          case 'pollinations': return { icon: '🌸', name: 'Pollinations', desc: 'Бесплатно. Рисует с нуля (игнорирует фото). Лучше понимает английский.', hasFree: true, needsKey: false };
       }
   };
 
@@ -143,7 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           {/* API Key Input */}
           {currentInfo.needsKey && (
             <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">API Key</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ</label>
                 <input 
                 type="password" 
                 value={apiKey}
@@ -193,7 +193,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             <Button onClick={handleSave} isLoading={status === 'checking'} className="flex-1 rounded-xl">Сохранить</Button>
           </div>
           
-          <button onClick={onClose} className="w-full text-xs text-gray-400 py-2 hover:text-gray-600">Закрыть</button>
+          <Button 
+            onClick={onClose} 
+            variant="secondary" 
+            className="w-full mt-4 bg-gray-800 hover:bg-black shadow-none border-none text-white"
+          >
+            Закрыть
+          </Button>
         </div>
       </div>
     </div>
