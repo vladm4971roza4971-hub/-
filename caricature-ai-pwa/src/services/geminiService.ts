@@ -16,6 +16,8 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const generateCaricature = async (
   mainImageBase64: string, 
   style: ArtStyle, 
@@ -177,20 +179,52 @@ export const generateCaricature = async (
         });
     });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: parts,
-      },
-      config: {
-         safetySettings: [
-             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-             { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-             { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-         ]
+    let response;
+    let retries = 0;
+    const maxRetries = 2;
+
+    while (true) {
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: parts,
+          },
+          config: {
+            safetySettings: [
+                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            ]
+          }
+        });
+        break; // Success, exit loop
+      } catch (err: any) {
+        // Check for Quota Exceeded (429)
+        const msg = err.message || '';
+        const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+        
+        if (isQuota) {
+           // Try to extract specific wait time
+           const retryMatch = msg.match(/retry in ([0-9.]+)s/);
+           if (retryMatch) {
+              const seconds = Math.ceil(parseFloat(retryMatch[1]));
+              throw new Error(`⚠️ Лимит запросов превышен. Пожалуйста, подождите ${seconds} сек. и попробуйте снова.`);
+           }
+           throw new Error("⚠️ Слишком много запросов. Сервер перегружен, попробуйте через минуту.");
+        }
+
+        if (retries < maxRetries) {
+          retries++;
+          console.warn(`Attempt ${retries} failed. Retrying...`);
+          await wait(2000 * retries); // Exponential backoff
+          continue;
+        }
+        
+        throw err; // Re-throw if not a quota error or max retries reached
       }
-    });
+    }
 
     // Parse response for image safely
     const candidate = response.candidates?.[0];
