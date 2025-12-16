@@ -744,7 +744,16 @@ const App: React.FC = () => {
                 <div className="flex-1 flex items-center justify-center bg-gray-50/50 rounded-xl relative overflow-hidden min-h-[350px]">
                   {state === AppState.IDLE && !generatedImage && <div className="text-center text-gray-400 p-8"><p className="text-6xl mb-4 opacity-50">🖼️</p><p className="text-sm">Результат появится здесь</p></div>}
                   {state === AppState.LOADING && <Spinner />}
-                  {state === AppState.ERROR && <div className="text-center p-8 max-w-sm"><p className="text-5xl mb-4">😕</p><p className="text-red-500 font-bold mb-2">Упс!</p><p className="text-gray-600 text-sm whitespace-pre-line">{error}</p></div>}
+                  {state === AppState.ERROR && (
+                    <div className="text-center p-8 max-w-sm">
+                        <p className="text-5xl mb-4">😕</p>
+                        <p className="text-red-500 font-bold mb-2">Упс!</p>
+                        <p className="text-gray-600 text-sm whitespace-pre-line mb-4">{error}</p>
+                        <Button onClick={() => setIsSettingsOpen(true)} className="text-xs py-2 px-4" variant="outline">
+                           ⚙️ Изменить настройки
+                        </Button>
+                    </div>
+                  )}
                   {generatedImage && state !== AppState.LOADING && <div className="relative w-full h-full flex items-center justify-center"><img src={generatedImage} alt="Caricature" onClick={() => setFullScreenImage(generatedImage)} className="max-w-full max-h-[600px] object-contain rounded-lg shadow-sm transition-all duration-500 animate-fade-in hover:scale-[1.01] cursor-zoom-in" style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} /></div>}
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
