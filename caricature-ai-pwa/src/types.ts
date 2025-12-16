@@ -1,3 +1,4 @@
+
 export enum AppState {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
@@ -76,4 +77,14 @@ export interface SelectionData {
   type: Tool;
   points: Point[]; // Used for pencil
   rect?: { x: number; y: number; w: number; h: number }; // Used for rectangle
+}
+
+// --- New Settings Types ---
+
+export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
+
+export interface AppSettings {
+  provider: AIProvider;
+  apiKey: string;
+  baseUrl?: string; // Optional custom endpoint
 }
