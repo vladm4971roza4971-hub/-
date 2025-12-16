@@ -54,14 +54,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl scale-100">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in" style={{ touchAction: 'none' }}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl scale-100 relative">
         <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
           ⚙️ Настройки API
         </h3>
         
         <p className="text-xs text-gray-500 mb-4">
-          По умолчанию используется встроенный ключ. Вы можете использовать свой ключ Google Gemini API, чтобы обойти ограничения бесплатной версии.
+          По умолчанию используется встроенный ключ. Вы можете использовать свой ключ Google Gemini API.
         </p>
 
         <div className="space-y-4">
