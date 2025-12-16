@@ -107,7 +107,6 @@ export enum Tool {
 }
 
 // Types
-export type Quality = 'Standard' | 'High';
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
 // Interfaces
@@ -145,6 +144,5 @@ export interface SelectionData {
 export interface AppSettings {
   provider: AIProvider;
   apiKey: string;
-  geminiProApiKey?: string;
   baseUrl?: string;
 }
