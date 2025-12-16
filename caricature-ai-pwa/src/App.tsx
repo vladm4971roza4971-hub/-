@@ -452,6 +452,39 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); setError("Ошибка при обработке изображения."); }
   };
 
+  const handleTextMode = async () => {
+      // Create a white 1024x1024 canvas for text-to-image mode
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, 1024, 1024);
+          
+          // Optional: Draw some faint text to indicate it's a canvas
+          ctx.fillStyle = '#f3f4f6';
+          ctx.font = 'bold 40px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Холст для описания', 512, 512);
+
+          const dataUrl = canvas.toDataURL('image/jpeg');
+          setOriginalImage(dataUrl);
+          setRawBase64(dataUrl.split(',')[1]);
+          setMimeType('image/jpeg');
+          setGeneratedImage(null);
+          setError(null);
+          setState(AppState.IDLE);
+          setIsEditing(false);
+          setSelection(null); 
+          setReferenceImages([]); 
+          setActiveReferenceId(null); 
+          setStampSource(null);
+          setCustomPrompt("Funny caricature of..."); // Pre-fill to guide user
+      }
+  };
+
   const handleReferenceFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
@@ -653,7 +686,37 @@ const App: React.FC = () => {
           style={{ touchAction: 'none' }}
         >
            <button onClick={() => setFullScreenImage(null)} className="absolute top-6 right-6 z-10 text-white/80 bg-white/10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-white/20 hover:text-white transition-all backdrop-blur-md border border-white/10">✕</button>
-           <img src={fullScreenImage} alt="Full Screen" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} />
+           <img src={fullScreenImage} alt="Full Screen" className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} />
+           
+           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-4 pointer-events-none">
+              <div className="pointer-events-auto flex gap-4 w-full max-w-sm">
+                <Button variant="secondary" onClick={(e) => {
+                    e.stopPropagation();
+                    const link = document.createElement('a');
+                    link.href = fullScreenImage;
+                    link.download = `caricature-${Date.now()}.png`;
+                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50">
+                  📥 Скачать
+                </Button>
+                <Button onClick={(e) => {
+                    e.stopPropagation();
+                    const item = history.find(i => i.url === fullScreenImage);
+                    if (item) {
+                       loadFromHistory(item);
+                    } else {
+                       // Fallback if trying to edit something not in history list yet
+                       setGeneratedImage(fullScreenImage);
+                       setState(AppState.SUCCESS);
+                       setOriginalImage(null);
+                       window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    setFullScreenImage(null);
+                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50 bg-white text-dark hover:bg-gray-100 border-none">
+                  ✏️ Редактор
+                </Button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -685,8 +748,9 @@ const App: React.FC = () => {
             <div className="text-6xl mb-4 animate-bounce">🎨</div>
             <h2 className="text-3xl md:text-5xl font-black text-gray-800 mb-2 leading-tight">Создайте свой <br /><span className="text-primary transform -rotate-2 inline-block">Шарж</span></h2>
             <p className="text-lg text-gray-500 max-w-xs mx-auto">Загрузите фото, и искусственный интеллект превратит его в веселую карикатуру.</p>
-            <div className="pt-8 w-full max-w-xs">
+            <div className="pt-8 w-full max-w-sm flex flex-col gap-3">
               <Button onClick={() => fileInputRef.current?.click()} className="w-full text-lg py-4 shadow-xl shadow-primary/20 rounded-2xl">Загрузить фото 📸</Button>
+              <Button onClick={handleTextMode} variant="secondary" className="w-full text-md py-3 shadow-lg shadow-secondary/10 rounded-2xl bg-white text-secondary border-2 border-secondary/20 hover:bg-secondary hover:text-white">По описанию 📝</Button>
             </div>
           </div>
         )}
@@ -777,7 +841,7 @@ const App: React.FC = () => {
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><span>🕰️</span> История</h2>
             <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
               {history.map((item) => (
-                <div key={item.id} onClick={() => loadFromHistory(item)} className="flex-shrink-0 w-32 bg-white p-2 rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform">
+                <div key={item.id} onClick={() => setFullScreenImage(item.url)} className="flex-shrink-0 w-32 bg-white p-2 rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform cursor-pointer">
                   <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50"><img src={item.url} alt="History" className="w-full h-full object-cover" /></div>
                   <div className="flex justify-between items-center px-1"><span className="text-[9px] font-bold text-gray-500 truncate max-w-[60px]">{item.style}</span><span className="text-[9px] text-gray-300">{new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div>
                 </div>
