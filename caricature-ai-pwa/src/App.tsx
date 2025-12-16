@@ -684,12 +684,9 @@ const App: React.FC = () => {
   const handleSaveAs = async (filename: string, format: 'png' | 'jpeg') => {
     if (!generatedImage) return;
     
-    // We will draw the image to a temporary canvas to convert it if needed
-    // generatedImage could be a PNG base64 already.
     const img = new Image();
     img.src = generatedImage;
     
-    // Wait for image load
     await new Promise((resolve) => {
         if (img.complete) resolve(true);
         img.onload = () => resolve(true);
@@ -701,14 +698,11 @@ const App: React.FC = () => {
     const ctx = canvas.getContext('2d');
     
     if (ctx) {
-        // Fill white background for JPEGs as they don't support transparency
         if (format === 'jpeg') {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         
-        // Apply edits if they exist (usually edits are baked into generatedImage, 
-        // but let's re-apply current editValues just in case user is in editing mode)
         if (isEditing) {
              ctx.filter = `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)`;
         }
@@ -763,7 +757,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-dark font-sans selection:bg-primary selection:text-white pb-32 lg:pb-12">
+    <div className="min-h-screen bg-gray-50 text-dark font-sans selection:bg-primary selection:text-white pb-32 lg:pb-12 overflow-x-hidden">
       <SaveModal 
         isOpen={isSaveModalOpen} 
         onClose={() => setIsSaveModalOpen(false)} 
@@ -780,8 +774,9 @@ const App: React.FC = () => {
       {/* Full Screen Image Modal */}
       {fullScreenImage && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in touch-none"
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setFullScreenImage(null)}
+          style={{ touchAction: 'none' }}
         >
            <button 
              onClick={() => setFullScreenImage(null)}
@@ -994,8 +989,11 @@ const App: React.FC = () => {
 
                 {/* Image Container */}
                 <div 
-                    className={`relative w-full rounded-xl overflow-hidden bg-[url('https://t3.ftcdn.net/jpg/03/76/74/78/360_F_376747823_L8il80K6c0B8K47eqV8a6q8b75k4b8h0.jpg')] bg-repeat border-2 border-dashed border-gray-300 shadow-inner max-h-[60vh] lg:max-h-none ${activeTool !== Tool.NONE ? 'touch-none' : ''}`}
-                    style={{ backgroundSize: '16px 16px' }}
+                    className={`relative w-full rounded-xl overflow-hidden bg-[url('https://t3.ftcdn.net/jpg/03/76/74/78/360_F_376747823_L8il80K6c0B8K47eqV8a6q8b75k4b8h0.jpg')] bg-repeat border-2 border-dashed border-gray-300 shadow-inner max-h-[60vh] lg:max-h-none`}
+                    style={{ 
+                        backgroundSize: '16px 16px',
+                        touchAction: activeTool === Tool.NONE ? 'pan-y' : 'none' 
+                    }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
