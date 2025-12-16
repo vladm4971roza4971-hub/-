@@ -58,7 +58,6 @@ export enum ArtStyle {
   BAUHAUS = 'Баухаус',
   SAMURAI = 'Самурай',
   
-  // --- NEW ADDITIONS ---
   CUTE_CREATURE = 'Милашка',
   FUTURE_ARCH = 'Футуризм (Арх)',
   GOTHIC_ARCH = 'Готика (Арх)',
