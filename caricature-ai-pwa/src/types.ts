@@ -35,7 +35,30 @@ export enum ArtStyle {
   LINE_ART = 'Лайн-арт',
   CHIBI = 'Чиби',
   PHOTOREALISM = 'Фотореализм',
-  NEWSREEL = 'Кинохроника'
+  NEWSREEL = 'Кинохроника',
+  // New Styles
+  RENAISSANCE = 'Ренессанс',
+  ABSTRACT = 'Абстракция',
+  HOLOGRAM = 'Голограмма',
+  FANTASY = 'Фэнтези',
+  COMICS = 'Супергерой',
+  MANGA = 'Манга',
+  GROTESQUE = 'Гротеск',
+  TRIBAL = 'Трайбл',
+  MYSTICISM = 'Мистика',
+  CHILDRENS_BOOK = 'Детская книга',
+  ART_DECO = 'Арт-деко',
+  ART_NOUVEAU = 'Ар-нуво',
+  BAROQUE = 'Барокко',
+  CUBISM = 'Кубизм',
+  MECHA = 'Меха',
+  ANCIENT_EGYPT = 'Египет',
+  WILD_WEST = 'Дикий Запад',
+  PSYCHEDELIC = 'Психоделика',
+  CAVE_PAINTING = 'Наскальный',
+  POST_APOCALYPTIC = 'Постапокалипсис',
+  BAUHAUS = 'Баухаус',
+  SAMURAI = 'Самурай'
 }
 
 export interface GeneratedImage {
