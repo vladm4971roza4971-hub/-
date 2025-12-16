@@ -17,10 +17,10 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 // Helper: Resize image to reduce payload size (Critical for free HF API)
+// Reduced to 480px and 0.6 quality to ensure it fits in free tier payload limits
 const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
-        // No crossOrigin needed for Data URLs created from local strings
         img.src = `data:${mimeType};base64,${base64}`;
         img.onload = () => {
             let { width, height } = img;
@@ -44,8 +44,8 @@ const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0, width, height);
-                // Convert to JPEG with compression to save bandwidth
-                const newData = canvas.toDataURL('image/jpeg', 0.8);
+                // Aggressive compression (0.6) for free tier stability
+                const newData = canvas.toDataURL('image/jpeg', 0.6);
                 resolve(newData.split(',')[1]);
             } else {
                 resolve(base64);
@@ -104,6 +104,8 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
             return true; 
         } catch (e) {
             console.error("HF status check failed", e);
+            // If network fails entirely, assume key might be ok but net is down, 
+            // but for validation purposes we return false to force check.
             return false;
         }
     }
@@ -307,9 +309,9 @@ const generateWithHuggingFace = async (
 ) => {
     const stylePrompt = getStylePrompt(style);
 
-    // CRITICAL: Resize image to max 512px to prevent "Failed to fetch" (Payload too large)
-    // The free inference API struggles with anything larger than standard SD res (512x512)
-    const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 512);
+    // CRITICAL: Resize image to max 450px to prevent "Failed to fetch" (Payload too large)
+    // The free inference API struggles with anything larger.
+    const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 450);
 
     // INSTRUCT PIX2PIX (Image Editing)
     const model = "timbrooks/instruct-pix2pix";
@@ -340,7 +342,9 @@ const generateWithHuggingFace = async (
         if (!response.ok) {
             const err = await response.text();
             if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
-            throw new Error(`HF Error: ${response.statusText} - ${err.slice(0, 100)}`);
+            // If still too large
+            if (response.status === 413) throw new Error("Файл слишком большой для Hugging Face. Попробуйте обрезать его.");
+            throw new Error(`HF Error: ${response.status} - ${err.slice(0, 100)}`);
         }
 
         const blob = await response.blob();
@@ -351,9 +355,9 @@ const generateWithHuggingFace = async (
             reader.readAsDataURL(blob);
         });
     } catch (error: any) {
-        // Handle network errors (Failed to fetch) gracefully
-        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
-             throw new Error("Ошибка соединения с Hugging Face. Изображение слишком большое или сервер перегружен. Попробуйте обрезать фото или выбрать другое.");
+        // Explicitly handle TypeError for network/fetch failures
+        if (error.name === 'TypeError' || error.message.includes('fetch')) {
+             throw new Error("Ошибка соединения с Hugging Face. \nВозможно, интернет-фильтр блокирует доступ или файл все еще велик.\nПопробуйте VPN или другой сервис в настройках.");
         }
         throw error;
     }
