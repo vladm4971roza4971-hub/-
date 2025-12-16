@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AppState, ArtStyle, Tool } from './types';
-import type { Quality, HistoryItem, SelectionData, Point, ReferenceImage, AppSettings } from './types';
+import type { HistoryItem, SelectionData, Point, ReferenceImage, AppSettings } from './types';
 import { Button } from './components/Button';
 import { Spinner } from './components/Spinner';
 import { StyleSelector } from './components/StyleSelector';
@@ -25,8 +25,6 @@ const App: React.FC = () => {
 
   // Settings
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ArtStyle.CARTOON);
-  const [quality, setQuality] = useState<Quality>('Standard');
-  // Removed imageSize state
   const [customPrompt, setCustomPrompt] = useState<string>('');
   
   // Tools
@@ -370,7 +368,7 @@ const App: React.FC = () => {
         }
       }
 
-      const resultUrl = await generateCaricature(mainInputBase64, selectedStyle, customPrompt, referenceImages, quality, mimeType, appSettings);
+      const resultUrl = await generateCaricature(mainInputBase64, selectedStyle, customPrompt, referenceImages, mimeType, appSettings);
       
       let finalResultUrl = resultUrl;
       const isGemini = !appSettings || appSettings.provider === 'gemini';
@@ -421,7 +419,7 @@ const App: React.FC = () => {
               <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100"><div className="flex justify-between items-center mb-3"><h3 className="text-xs font-bold text-gray-400">ДОП. ФОТО</h3><button onClick={() => refInputRef.current?.click()} className="text-xs bg-gray-50 px-2 py-1 rounded font-bold">+ Добавить</button></div><div className="grid grid-cols-4 gap-2">{referenceImages.map(ref => <div key={ref.id} onClick={() => switchToImage(ref.id)} className={`relative aspect-square rounded overflow-hidden cursor-pointer border-2 ${activeReferenceId === ref.id ? 'border-secondary' : 'border-gray-100'}`}><img src={ref.originalUrl} className="w-full h-full object-cover" /><button onClick={e => handleDeleteReference(e, ref.id)} className="absolute top-0 right-0 bg-black/50 text-white w-4 h-4 flex items-center justify-center text-[10px]">×</button></div>)}</div></div>
               <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 space-y-5">
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Стиль</label><StyleSelector selectedStyle={selectedStyle} onSelect={setSelectedStyle} disabled={state === AppState.LOADING} /></div>
-                <div><label className="block text-sm font-bold text-gray-700 mb-2">Качество</label><div className="flex bg-gray-50 p-1 rounded-xl">{(['Standard', 'High'] as Quality[]).map(q => <button key={q} onClick={() => setQuality(q)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg ${quality === q ? 'bg-white shadow' : 'text-gray-400'}`}>{q === 'Standard' ? 'Быстро (Flash)' : 'HD (Pro)'}</button>)}</div></div>
+                
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Детали</label><textarea rows={3} value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder="Например: надень шляпу..." className="w-full p-3 rounded-xl bg-gray-50 outline-none text-sm" />{showEnglishHint && <p className="text-[10px] text-orange-500 mt-1 font-bold">💡 Лучше писать на английском.</p>}</div>
               </div>
             </div>
