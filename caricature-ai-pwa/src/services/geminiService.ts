@@ -148,7 +148,6 @@ const getStylePrompt = (style: ArtStyle): string => {
         case ArtStyle.PHOTOREALISM: return "hyper-realistic caricature, cinematic lighting, 8k resolution, highly detailed skin texture, unreal engine 5 render style, exaggerated but realistic";
         case ArtStyle.NEWSREEL: return "vintage newsreel style caricature, grainy black and white film aesthetic, 1940s historical footage look, slight motion blur, vignette effect, scratches and dust";
         
-        // New Styles
         case ArtStyle.RENAISSANCE: return "renaissance painting style caricature, Leonardo da Vinci style, oil on canvas, soft lighting, sfumato, classical composition";
         case ArtStyle.ABSTRACT: return "abstract painting style caricature, picasso style, distorted shapes, bold geometric forms, artistic abstraction";
         case ArtStyle.HOLOGRAM: return "3D hologram projection caricature, translucent blue glowing figure, sci-fi interface style, digital scanlines, futuristic tech";
@@ -172,6 +171,45 @@ const getStylePrompt = (style: ArtStyle): string => {
         case ArtStyle.BAUHAUS: return "bauhaus design style caricature, minimalist geometric shapes, primary colors (red blue yellow), clean typography, functional art";
         case ArtStyle.SAMURAI: return "feudal japan samurai art style, ink wash painting, aggressive stance, katana, cherry blossoms, traditional japanese warrior";
         
+        // --- NEW ADDITIONS ---
+        case ArtStyle.CUTE_CREATURE: return "cute creature caricature, big shiny eyes, fluffy texture, soft lighting, adorable mascot style, 3d render";
+        case ArtStyle.FUTURE_ARCH: return "futuristic architecture style, parametric design, zaha hadid style, sweeping curves, glass and steel, white modern structures";
+        case ArtStyle.GOTHIC_ARCH: return "gothic architecture style, flying buttresses, pointed arches, intricate stone carving, cathedral atmosphere, dark stone";
+        case ArtStyle.BRUTALISM: return "brutalist architecture style, raw concrete textures, massive geometric blocks, imposing structures, monolithic look";
+        case ArtStyle.AI_LOGO: return "modern AI vector logo style, minimalist, gradient colors, clean lines, scalable vector graphics aesthetic, tech company logo";
+        case ArtStyle.FANTASY_MAP: return "fantasy map style, parchment texture, ink drawn mountains and rivers, compass rose, calligraphy, lord of the rings map style";
+        case ArtStyle.OCEAN_LIFE: return "underwater ocean life style, coral reef background, blue water caustics, bubbles, vibrant tropical fish colors";
+        case ArtStyle.SPACE_WORLD: return "deep space style, stars, nebulae backgrounds, planets, sci-fi atmosphere, cosmic lighting";
+        case ArtStyle.URBAN_FASHION: return "urban fashion illustration style, streetwear clothing, stylish pose, hypebeast aesthetic, marker drawing";
+        case ArtStyle.MINIMALISM: return "minimalistic art style, ultra clean, negative space, simple shapes, limited color palette, flat design";
+        case ArtStyle.HORROR: return "haunted horror portrait, ghostly apparition, motion blur, creepy atmosphere, dark shadows, scary movie aesthetic";
+        case ArtStyle.ROMANTICISM: return "romanticism painting style, caspar david friedrich style, emotional, dramatic nature background, soft atmospheric fog";
+        case ArtStyle.ABSTRACT_EXPRESSIONISM: return "abstract expressionism style, jackson pollock style, chaotic paint splatters, dynamic drips, intense energy";
+        case ArtStyle.GLADIATOR: return "roman gladiator style, arena background, armor, dusty atmosphere, epic cinematic lighting, historical movie look";
+        case ArtStyle.ALIEN_FLORA: return "alien world flora style, bioluminescent plants, strange colors, avatar movie aesthetic, exotic vegetation";
+        case ArtStyle.FAIRY_TALE: return "classic fairy tale book illustration, magical dust, enchanted forest background, whimsical, golden hour lighting";
+        case ArtStyle.MYTHIC_CREATURE: return "mythological creature style, epic fantasy art, scales and fur details, legendary beast aesthetic, dynamic pose";
+        case ArtStyle.CARNIVAL: return "venetian carnival style, masquerade masks, festive colors, confetti, mysterious celebration atmosphere";
+        case ArtStyle.ACTION_FIGURE: return "plastic action figure style, visible joints, toy packaging aesthetic, glossy plastic texture, blister pack look";
+        case ArtStyle.BLUEPRINT: return "technical blueprint style, cyanotype blue background, white technical lines, measurements, schematic layout";
+        case ArtStyle.ZOMBIE: return "zombie apocalypse style, decaying skin texture, ragged clothes, horror movie makeup, undead aesthetic";
+        case ArtStyle.BIOLUMINESCENCE: return "bioluminescent art style, glowing blue and purple lights, darkness, avatar pandora style, glowing organic shapes";
+        case ArtStyle.ICE_WORLD: return "frozen ice world style, ice sculptures, translucent blue ice textures, snow particles, cold atmosphere";
+        case ArtStyle.ATLANTIS: return "ancient atlantis underwater city style, greek ruins underwater, magical glowing crystals, mysterious ocean depths";
+        case ArtStyle.KAWAII_EMOJI: return "kawaii emoji style, simple vector graphics, extremely cute face, flat colors, stickers aesthetic";
+        case ArtStyle.WITCHCRAFT: return "witchcraft aesthetic, potions, spell books, dark magic symbols, candles, mystical purple lighting";
+        case ArtStyle.MECHANICAL_ANATOMY: return "mechanical anatomy cutaway style, gears inside body, medical illustration mixed with robotics, da vinci mechanical sketch";
+        case ArtStyle.CLOCKWORK: return "intricate clockwork mechanism style, brass gears, watch parts, golden metallic textures, steampunk automation";
+        case ArtStyle.MARIONETTE: return "wooden marionette puppet style, visible strings, wood grain texture, toy theater aesthetic";
+        case ArtStyle.TROPICAL: return "tropical paradise style, vibrant jungle colors, palm leaves, hibiscus flowers, summer vibes, tiki art";
+        case ArtStyle.ELVEN: return "elven fantasy art style, elegant ornate designs, nature magic, ethereal lighting, lord of the rings elf aesthetic";
+        case ArtStyle.ZENTANGLE: return "zentangle art style, intricate black and white patterns, meditative doodles, high detail ink drawing";
+        case ArtStyle.MAYAN: return "ancient mayan art style, stone carvings, glyphs, step pyramids background, mesoamerican patterns";
+        case ArtStyle.DECOUPAGE: return "decoupage art style, layered paper cutouts, vintage floral patterns, craft aesthetic, mod podge texture";
+        case ArtStyle.TERRARIUM: return "glass terrarium world style, miniature ecosystem inside glass, moss, small plants, macro photography look";
+        case ArtStyle.COLLAGE: return "mixed media photo collage style, cut paper edges, magazine clippings, dada art aesthetic, chaotic composition";
+        case ArtStyle.PLAYING_CARD: return "vintage playing card style, symmetry, king or queen card aesthetic, flat colors, ornate card border";
+
         default: return "funny caricature";
       }
 };
