@@ -13,8 +13,8 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSettingsChange, currentSettings }) => {
   const [provider, setProvider] = useState<AIProvider>('gemini');
   const [apiKey, setApiKey] = useState('');
-  const [geminiProApiKey, setGeminiProApiKey] = useState(''); // New State for Pro Key
-  const [baseUrl, setBaseUrl] = useState(''); // Optional, for proxies
+  const [geminiProApiKey, setGeminiProApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   
   const [status, setStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
@@ -27,7 +27,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         setGeminiProApiKey(currentSettings.geminiProApiKey || '');
         setBaseUrl(currentSettings.baseUrl || '');
       } else {
-        // Defaults
         setProvider('gemini');
         setApiKey('');
         setGeminiProApiKey('');
@@ -39,7 +38,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   }, [isOpen, currentSettings]);
 
   const handleSave = async () => {
-    // Pollinations doesn't need a key
     if (provider !== 'pollinations' && !apiKey.trim()) {
       onSettingsChange(null);
       onClose();
@@ -100,7 +98,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         
         <div className="space-y-4">
           
-          {/* Provider Selector */}
           <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Выберите сервис</label>
               <div className="grid grid-cols-3 gap-2">
@@ -126,59 +123,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   <p className="text-xs text-gray-500 leading-relaxed">
                       {currentInfo.desc}
                   </p>
-                  {!currentInfo.needsKey && (
-                      <p className="text-xs text-green-600 font-bold mt-1">✅ Ключ не требуется!</p>
-                  )}
-                  {provider === 'pollinations' && (
-                      <p className="text-xs text-orange-500 font-bold mt-1">⚠️ Работает только по тексту (фото игнорируется)</p>
-                  )}
-                  {provider === 'huggingface' && (
-                      <div className="mt-2 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                        <p className="text-[10px] text-blue-600 font-bold mb-1">Как создать токен:</p>
-                        <p className="text-[10px] text-blue-500 leading-tight">
-                          1. Выберите тип <b>Fine-grained</b><br/>
-                          2. В разделе <b>User Permissions</b> найдите <b>Inference</b><br/>
-                          3. Отметьте галочку <b className="text-blue-700">Make calls to Inference Providers</b>
-                        </p>
-                      </div>
-                  )}
+                  {!currentInfo.needsKey && <p className="text-xs text-green-600 font-bold mt-1">✅ Ключ не требуется!</p>}
+                  {provider === 'pollinations' && <p className="text-xs text-orange-500 font-bold mt-1">⚠️ Работает только по тексту (фото игнорируется)</p>}
+                  {provider === 'huggingface' && <div className="mt-2 bg-blue-50 p-2 rounded-lg border border-blue-100"><p className="text-[10px] text-blue-600 font-bold mb-1">Как создать токен:</p><p className="text-[10px] text-blue-500 leading-tight">1. Выберите тип <b>Fine-grained</b><br/>2. В разделе <b>User Permissions</b> найдите <b>Inference</b><br/>3. Отметьте галочку <b className="text-blue-700">Make calls to Inference Providers</b></p></div>}
               </div>
           </div>
 
-          {/* API Key Input */}
           {currentInfo.needsKey && (
             <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                   API Ключ {provider === 'gemini' ? '(Flash)' : ''}
-                </label>
-                <input 
-                type="password" 
-                value={apiKey}
-                onChange={(e) => {
-                    setApiKey(e.target.value);
-                    setStatus('idle');
-                    setStatusMsg('');
-                }}
-                placeholder={`Ключ для ${currentInfo.name}`}
-                className={`w-full p-3 rounded-xl bg-gray-50 border outline-none transition-all ${status === 'invalid' ? 'border-red-400 bg-red-50' : status === 'valid' ? 'border-green-400 bg-green-50' : 'border-gray-200 focus:border-secondary focus:bg-white'}`}
-                />
+                <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ {provider === 'gemini' ? '(Flash)' : ''}</label>
+                <input type="password" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setStatus('idle'); setStatusMsg(''); }} placeholder={`Ключ для ${currentInfo.name}`} className={`w-full p-3 rounded-xl bg-gray-50 border outline-none transition-all ${status === 'invalid' ? 'border-red-400 bg-red-50' : status === 'valid' ? 'border-green-400 bg-green-50' : 'border-gray-200 focus:border-secondary focus:bg-white'}`} />
 
-                {/* Optional Second Key for Gemini Pro */}
                 {provider === 'gemini' && (
                   <div className="mt-3">
-                     <label className="block text-sm font-bold text-gray-700 mb-2">
-                       API Ключ (Pro / High Quality) <span className="text-gray-400 font-normal">- Опционально</span>
-                     </label>
-                     <input 
-                      type="password" 
-                      value={geminiProApiKey}
-                      onChange={(e) => setGeminiProApiKey(e.target.value)}
-                      placeholder="Отдельный ключ для Pro модели"
-                      className="w-full p-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-secondary focus:bg-white outline-none transition-all"
-                     />
-                     <p className="text-[10px] text-gray-400 mt-1">
-                        Используется, если выбрано "HD" качество. Если пусто, используется основной ключ.
-                     </p>
+                     <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ (Pro / High Quality) <span className="text-gray-400 font-normal">- Опционально</span></label>
+                     <input type="password" value={geminiProApiKey} onChange={(e) => setGeminiProApiKey(e.target.value)} placeholder="Отдельный ключ для Pro модели" className="w-full p-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-secondary focus:bg-white outline-none transition-all" />
+                     <p className="text-[10px] text-gray-400 mt-1">Используется, если выбрано "HD" качество. Если пусто, используется основной ключ.</p>
                   </div>
                 )}
 
@@ -191,42 +151,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             </div>
           )}
           
-          {/* Base URL Input (Optional) - Hidden for Pollinations/HF unless needed */}
           {provider !== 'pollinations' && (
             <details className="group">
-                <summary className="text-xs font-bold text-gray-500 cursor-pointer hover:text-dark select-none list-none flex items-center gap-1">
-                    <span className="transform group-open:rotate-90 transition-transform">▶</span> Дополнительно (Proxy URL)
-                </summary>
-                <div className="mt-2 pl-2 border-l-2 border-gray-100">
-                    <input 
-                        type="text" 
-                        value={baseUrl}
-                        onChange={(e) => setBaseUrl(e.target.value)}
-                        placeholder="https://..."
-                        className="w-full p-2 text-xs rounded-lg bg-gray-50 border border-gray-200 focus:border-secondary outline-none"
-                    />
-                </div>
+                <summary className="text-xs font-bold text-gray-500 cursor-pointer hover:text-dark select-none list-none flex items-center gap-1"><span className="transform group-open:rotate-90 transition-transform">▶</span> Дополнительно (Proxy URL)</summary>
+                <div className="mt-2 pl-2 border-l-2 border-gray-100"><input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="w-full p-2 text-xs rounded-lg bg-gray-50 border border-gray-200 focus:border-secondary outline-none" /></div>
             </details>
           )}
 
-          {statusMsg && (
-                <p className={`text-xs mt-2 font-bold text-center animate-pulse ${status === 'valid' ? 'text-green-600' : status === 'invalid' ? 'text-red-500' : 'text-gray-500'}`}>
-                    {statusMsg}
-                </p>
-          )}
+          {statusMsg && <p className={`text-xs mt-2 font-bold text-center animate-pulse ${status === 'valid' ? 'text-green-600' : status === 'invalid' ? 'text-red-500' : 'text-gray-500'}`}>{statusMsg}</p>}
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={handleClear} className="flex-1 rounded-xl text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">Сбросить</Button>
             <Button onClick={handleSave} isLoading={status === 'checking'} className="flex-1 rounded-xl">Сохранить</Button>
           </div>
-          
-          <Button 
-            onClick={onClose} 
-            variant="secondary" 
-            className="w-full mt-4 bg-gray-800 hover:bg-black shadow-none border-none text-white"
-          >
-            Закрыть
-          </Button>
+          <Button onClick={onClose} variant="secondary" className="w-full mt-4 bg-gray-800 hover:bg-black shadow-none border-none text-white">Закрыть</Button>
         </div>
       </div>
     </div>
