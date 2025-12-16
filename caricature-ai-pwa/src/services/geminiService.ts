@@ -147,6 +147,31 @@ const getStylePrompt = (style: ArtStyle): string => {
         case ArtStyle.CHIBI: return "chibi anime style caricature, super deformed, giant head small body, large eyes, extremely cute and round";
         case ArtStyle.PHOTOREALISM: return "hyper-realistic caricature, cinematic lighting, 8k resolution, highly detailed skin texture, unreal engine 5 render style, exaggerated but realistic";
         case ArtStyle.NEWSREEL: return "vintage newsreel style caricature, grainy black and white film aesthetic, 1940s historical footage look, slight motion blur, vignette effect, scratches and dust";
+        
+        // New Styles
+        case ArtStyle.RENAISSANCE: return "renaissance painting style caricature, Leonardo da Vinci style, oil on canvas, soft lighting, sfumato, classical composition";
+        case ArtStyle.ABSTRACT: return "abstract painting style caricature, picasso style, distorted shapes, bold geometric forms, artistic abstraction";
+        case ArtStyle.HOLOGRAM: return "3D hologram projection caricature, translucent blue glowing figure, sci-fi interface style, digital scanlines, futuristic tech";
+        case ArtStyle.FANTASY: return "fantasy world caricature, magic glowing effects, mythical atmosphere, rpg character portrait style, detailed background";
+        case ArtStyle.COMICS: return "modern comic book superhero style caricature, bold ink lines, dynamic shading, vibrant glossy colors, marvel/dc comics aesthetic";
+        case ArtStyle.MANGA: return "black and white manga panel style caricature, screen tones, speed lines, dramatic shading, japanese comic aesthetic";
+        case ArtStyle.GROTESQUE: return "grotesque art style caricature, exaggerated ugly features, strange proportions, dark humor, highly detailed texture, odd realism";
+        case ArtStyle.TRIBAL: return "tribal art style caricature, indigenous patterns, tattoo style linework, earthy tones, symbolic motifs";
+        case ArtStyle.MYSTICISM: return "mysticism art style caricature, tarot card aesthetic, glowing runes, celestial symbols, spiritual atmosphere, esoteric";
+        case ArtStyle.CHILDRENS_BOOK: return "children's book illustration style caricature, soft pastel colors, whimsical, friendly shapes, storybook aesthetic";
+        case ArtStyle.ART_DECO: return "art deco style caricature, geometric gold patterns, roaring 20s aesthetic, elegant lines, luxury poster style";
+        case ArtStyle.ART_NOUVEAU: return "art nouveau style caricature, alphonse mucha style, organic curves, floral borders, elegant flowing hair, vintage poster";
+        case ArtStyle.BAROQUE: return "baroque painting style caricature, dramatic lighting, rich deep colors, emotional expression, ornate details, rembrandt style";
+        case ArtStyle.CUBISM: return "cubist art style caricature, fragmented objects, multiple viewpoints, geometric planes, abstract faces";
+        case ArtStyle.MECHA: return "mecha robot style caricature, mechanical parts, metal armor plates, robotic joints, scifi machinery, gundam aesthetic";
+        case ArtStyle.ANCIENT_EGYPT: return "ancient egyptian art style caricature, profile view, hieroglyphs background, gold and lapis lazuli colors, papyrus texture";
+        case ArtStyle.WILD_WEST: return "wild west wanted poster style caricature, sepia tone, parchment texture, western font, cowboy aesthetic";
+        case ArtStyle.PSYCHEDELIC: return "psychedelic poster art style caricature, swirling colors, trippy patterns, 60s flower power, hallucinogenic visuals";
+        case ArtStyle.CAVE_PAINTING: return "prehistoric cave painting style caricature, primitive stick figures, ochre and charcoal pigments, stone wall texture";
+        case ArtStyle.POST_APOCALYPTIC: return "post-apocalyptic wasteland style caricature, mad max aesthetic, dusty, rusty metal, survival gear, dystopian atmosphere";
+        case ArtStyle.BAUHAUS: return "bauhaus design style caricature, minimalist geometric shapes, primary colors (red blue yellow), clean typography, functional art";
+        case ArtStyle.SAMURAI: return "feudal japan samurai art style, ink wash painting, aggressive stance, katana, cherry blossoms, traditional japanese warrior";
+        
         default: return "funny caricature";
       }
 };
@@ -194,16 +219,30 @@ const generateWithGemini = async (
                 contents: { parts },
                 config: {
                     safetySettings: [
-                        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-                        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+                        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                     ]
                 }
             });
-            const part = response.candidates?.[0]?.content?.parts?.[0];
-            if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-            throw new Error("Gemini не вернул изображение. Возможно, запрос был заблокирован фильтрами безопасности. Попробуйте изменить описание.");
+            const candidate = response.candidates?.[0];
+            const part = candidate?.content?.parts?.[0];
+            
+            if (part?.inlineData?.data) {
+                return `data:image/png;base64,${part.inlineData.data}`;
+            }
+
+            // If no image, check for text (refusal message)
+            if (part?.text) {
+                 throw new Error(`Gemini отклонил запрос: ${part.text}`);
+            }
+            
+            if (candidate?.finishReason) {
+                throw new Error(`Gemini завершил запрос со статусом: ${candidate.finishReason}. Попробуйте изменить описание или фото.`);
+            }
+
+            throw new Error("Gemini не вернул изображение. Попробуйте снова.");
         } catch (err: any) {
             // Enhanced 429 Quota Error Handling
             const msg = err.message || JSON.stringify(err);
