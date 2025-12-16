@@ -16,6 +16,48 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+// Helper: Resize image to reduce payload size (Critical for free HF API)
+const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = `data:${mimeType};base64,${base64}`;
+        img.onload = () => {
+            let { width, height } = img;
+            // If already small enough, return original
+            if (width <= maxDim && height <= maxDim) {
+                resolve(base64);
+                return;
+            }
+            // Calculate new aspect ratio
+            if (width > height) {
+                height *= maxDim / width;
+                width = maxDim;
+            } else {
+                width *= maxDim / height;
+                height = maxDim;
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                // Convert to JPEG with compression to save bandwidth
+                const newData = canvas.toDataURL('image/jpeg', 0.85);
+                resolve(newData.split(',')[1]);
+            } else {
+                resolve(base64);
+            }
+        };
+        img.onerror = () => {
+            console.warn("Resize failed, using original");
+            resolve(base64);
+        };
+    });
+};
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const validateApiKey = async (settings: AppSettings): Promise<boolean> => {
@@ -54,15 +96,12 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         }
 
         // Method 2: Check Model Status (Fallback)
-        // Note: Fine-grained tokens with ONLY 'Inference' permission might return 403 Forbidden for /status endpoint
-        // because they lack 'Read Data' permission. However, they are valid for inference.
-        // We only consider the key INVALID if we get 401 Unauthorized.
         try {
             const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
                 headers: { 'Authorization': `Bearer ${settings.apiKey}` }
             });
             if (res.status === 401) return false; // Invalid Key
-            return true; // 200 (OK), 503 (Loading), or 403 (Valid key, restricted scope)
+            return true; 
         } catch (e) {
             console.error("HF status check failed", e);
             return false;
@@ -263,20 +302,22 @@ const generateWithHuggingFace = async (
     apiKey: string,
     mainImageBase64: string,
     style: ArtStyle,
-    customPrompt: string
+    customPrompt: string,
+    mimeType: string
 ) => {
     const stylePrompt = getStylePrompt(style);
 
-    // If we have an image, we use Instruct Pix2Pix which is designed to EDIT images
-    // If no image (shouldn't happen in this app mostly), we fall back to SDXL
-    
+    // CRITICAL: Resize image to max 600px to prevent "Failed to fetch" (Payload too large)
+    // The free inference API struggles with full-res phone photos.
+    const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 600);
+
     // INSTRUCT PIX2PIX (Image Editing)
     const model = "timbrooks/instruct-pix2pix";
     const prompt = `turn him into a funny caricature, ${stylePrompt} style. ${customPrompt}`;
     
     // Construct JSON payload for HF Inference API
     const payload = {
-        inputs: mainImageBase64, // InstructPix2Pix accepts base64 string directly in inputs
+        inputs: resizedBase64, // Use the resized base64
         parameters: {
             prompt: prompt,
             num_inference_steps: 20,
@@ -367,7 +408,7 @@ export const generateCaricature = async (
       } else if (settings.provider === 'openai') {
           return await generateWithOpenAI(settings.apiKey, style, customPrompt, settings.baseUrl);
       } else if (settings.provider === 'huggingface') {
-          return await generateWithHuggingFace(settings.apiKey, mainImageBase64, style, customPrompt);
+          return await generateWithHuggingFace(settings.apiKey, mainImageBase64, style, customPrompt, mimeType);
       }
       throw new Error("Неизвестный провайдер");
   } catch (error: any) {
