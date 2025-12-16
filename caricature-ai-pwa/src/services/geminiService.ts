@@ -18,16 +18,38 @@ export const fileToBase64 = (file: File): Promise<string> => {
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    // Simple fast query to check if key works (Gemini 2.5 Flash is fast)
+    await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: 'test',
+    });
+    return true;
+  } catch (e) {
+    console.error("API Key Validation Failed:", e);
+    return false;
+  }
+};
+
 export const generateCaricature = async (
   mainImageBase64: string, 
   style: ArtStyle, 
   customPrompt: string,
   referenceImages: ReferenceImage[] = [],
   quality: Quality = 'Standard',
-  mimeType: string = 'image/jpeg'
+  mimeType: string = 'image/jpeg',
+  customApiKey?: string | null
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Use custom key if provided, otherwise fallback to env
+    const apiKey = customApiKey || process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("API Key не найден. Пожалуйста, добавьте его в настройках.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     
     // Construct a specific prompt based on the selected style
     let stylePrompt = "";
