@@ -43,11 +43,11 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
         return res.ok;
     }
     else if (settings.provider === 'huggingface') {
-        // Test with a simple model status check or inference
-        const res = await fetch('https://api-inference.huggingface.co/models/google-bert/bert-base-uncased', {
+        // Test with a simple model status check
+        const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
             headers: { 'Authorization': `Bearer ${settings.apiKey}` }
         });
-        return res.ok;
+        return res.ok || res.status === 503; // 503 means model loading, key is valid
     }
     return false;
   } catch (e) {
@@ -156,7 +156,7 @@ const generateWithGemini = async (
                     await wait(2000 * retries);
                     continue;
                 }
-                throw new Error("Лимит запросов Google Gemini исчерпан (429).\n\nСовет: Переключитесь на сервис 'Pollinations' в настройках (он бесплатный и безлимитный).");
+                throw new Error("Лимит запросов Google Gemini исчерпан (429).\n\nСовет: Переключитесь на сервис 'Hugging Face' (бесплатно, с токеном) или 'Pollinations' (без фото) в настройках.");
             }
             throw err;
         }
@@ -239,35 +239,50 @@ const generateWithOpenAI = async (
     return `data:image/png;base64,${data.data[0].b64_json}`;
 };
 
-// --- HUGGING FACE HANDLER (Text to Image) ---
+// --- HUGGING FACE HANDLER (Text to Image OR Image to Image via InstructPix2Pix) ---
 const generateWithHuggingFace = async (
     apiKey: string,
+    mainImageBase64: string,
     style: ArtStyle,
     customPrompt: string
 ) => {
     const stylePrompt = getStylePrompt(style);
-    // Using SDXL Base as it is widely supported on Inference API free tier
-    // Note: HF Inference API often doesn't support Img2Img via simple REST calls on the free tier without cold boot issues.
-    // We stick to T2I with detailed prompt.
-    const prompt = `A funny caricature portrait in the style of ${stylePrompt}. ${customPrompt}`;
 
-    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {
+    // If we have an image, we use Instruct Pix2Pix which is designed to EDIT images
+    // If no image (shouldn't happen in this app mostly), we fall back to SDXL
+    
+    // INSTRUCT PIX2PIX (Image Editing)
+    const model = "timbrooks/instruct-pix2pix";
+    const prompt = `turn him into a funny caricature, ${stylePrompt} style. ${customPrompt}`;
+    
+    // Construct JSON payload for HF Inference API
+    const payload = {
+        inputs: mainImageBase64, // InstructPix2Pix accepts base64 string directly in inputs
+        parameters: {
+            prompt: prompt,
+            num_inference_steps: 20,
+            image_guidance_scale: 1.5,
+            guidance_scale: 7.5
+        }
+    };
+
+    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json",
+            "x-use-cache": "false" 
         },
-        body: JSON.stringify({ inputs: prompt }),
+        body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
         const err = await response.text();
-        if (err.includes('loading')) throw new Error("Модель загружается. Попробуйте через 20 секунд.");
-        throw new Error(`HF Error: ${response.statusText}`);
+        if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
+        throw new Error(`HF Error: ${response.statusText} - ${err.slice(0, 100)}`);
     }
 
     const blob = await response.blob();
-    // Convert Blob to Base64
     return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -281,11 +296,12 @@ const generateWithPollinations = async (
     style: ArtStyle,
     customPrompt: string
 ) => {
+    // Pollinations is Text-to-Image in this implementation
     const stylePrompt = getStylePrompt(style);
     const prompt = encodeURIComponent(`funny caricature, ${stylePrompt}, ${customPrompt}`);
     
-    // Pollinations generates image via URL. We fetch it to get blob/base64 to save history.
-    const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}`;
+    // Pollinations generates image via URL.
+    const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
     
     const response = await fetch(url);
     if (!response.ok) throw new Error("Pollinations Service Error");
@@ -315,7 +331,7 @@ export const generateCaricature = async (
       return generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, quality, mimeType);
   }
 
-  // Pollinations doesn't need key
+  // Pollinations doesn't need key, BUT it ignores image
   if (settings?.provider === 'pollinations') {
       return await generateWithPollinations(style, customPrompt);
   }
@@ -332,12 +348,11 @@ export const generateCaricature = async (
       } else if (settings.provider === 'openai') {
           return await generateWithOpenAI(settings.apiKey, style, customPrompt, settings.baseUrl);
       } else if (settings.provider === 'huggingface') {
-          return await generateWithHuggingFace(settings.apiKey, style, customPrompt);
+          return await generateWithHuggingFace(settings.apiKey, mainImageBase64, style, customPrompt);
       }
       throw new Error("Неизвестный провайдер");
   } catch (error: any) {
       console.error("Generation Error:", error);
-      // Clean up error message for UI
       throw new Error(error.message || "Ошибка генерации изображения");
   }
 };
