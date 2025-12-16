@@ -152,6 +152,29 @@ const App: React.FC = () => {
       }
   };
 
+  const goHome = () => {
+      if (window.confirm("Вернуться на главный экран? Текущий прогресс будет потерян.")) {
+          setOriginalImage(null);
+          setRawBase64(null);
+          setGeneratedImage(null);
+          setState(AppState.IDLE);
+          setReferenceImages([]);
+          setActiveReferenceId(null);
+          setSelection(null);
+          setError(null);
+          setIsEditing(false);
+          setStampSource(null);
+      }
+  };
+
+  const handleExit = () => {
+      if (window.confirm("Выйти из приложения?")) {
+          window.close();
+          // Fallback if window.close() fails (browsers often block it)
+          window.location.reload(); 
+      }
+  };
+
   // --- Canvas Rendering Logic ---
 
   // Load the current image into the Main Canvas whenever it changes
@@ -726,11 +749,22 @@ const App: React.FC = () => {
       <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm safe-top">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
+            {originalImage && (
+                <button 
+                  onClick={goHome} 
+                  className="p-2 mr-1 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" 
+                  title="На главную"
+                >
+                  🏠
+                </button>
+            )}
             <span className="text-2xl">🎭</span>
-            <h1 className="text-xl font-comic font-bold text-gray-800">Карикатура AI</h1>
+            <h1 className="text-xl font-comic font-bold text-gray-800 hidden sm:block">Карикатура AI</h1>
+            <h1 className="text-xl font-comic font-bold text-gray-800 sm:hidden">Карикатура</h1>
           </div>
           <div className="flex items-center gap-2">
              <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" title="Настройки">⚙️</button>
+             <button onClick={handleExit} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" title="Выход">🚪</button>
              {installPrompt && (
                <button onClick={handleInstallClick} className="hidden sm:flex bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold items-center gap-2 hover:bg-gray-800 transition-colors animate-pulse shadow-lg shadow-black/20"><span>⬇️</span> Установить</button>
              )}
