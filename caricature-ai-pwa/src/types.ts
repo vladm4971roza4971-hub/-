@@ -108,7 +108,6 @@ export enum Tool {
 
 // Types
 export type Quality = 'Standard' | 'High';
-// ImageSize removed to fix build error
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
 // Interfaces
@@ -146,6 +145,6 @@ export interface SelectionData {
 export interface AppSettings {
   provider: AIProvider;
   apiKey: string;
-  geminiProApiKey?: string; // Optional separate key for Pro model
+  geminiProApiKey?: string;
   baseUrl?: string;
 }
