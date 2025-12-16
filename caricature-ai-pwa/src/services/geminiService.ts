@@ -1,5 +1,6 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
-import { ArtStyle, Quality, ReferenceImage, AppSettings, ImageSize } from "../types";
+import { ArtStyle } from "../types";
+import type { Quality, ReferenceImage, AppSettings, ImageSize } from "../types";
 
 // Helper to convert File to Base64
 export const fileToBase64 = (file: File): Promise<string> => {
