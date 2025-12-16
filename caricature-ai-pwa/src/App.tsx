@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AppState, ArtStyle, Tool } from './types';
-import type { Quality, HistoryItem, SelectionData, Point, ReferenceImage, AppSettings, ImageSize } from './types';
+import type { Quality, HistoryItem, SelectionData, Point, ReferenceImage, AppSettings } from './types';
 import { Button } from './components/Button';
 import { Spinner } from './components/Spinner';
 import { StyleSelector } from './components/StyleSelector';
@@ -14,30 +14,30 @@ const App: React.FC = () => {
   
   // Images Data
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [rawBase64, setRawBase64] = useState<string | null>(null); // Full image base64
+  const [rawBase64, setRawBase64] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('image/jpeg');
   
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   
-  // Reference Images (Additional photos)
+  // Reference Images
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
-  const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null); // If not null, we are editing a reference
+  const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null);
 
   // Settings
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ArtStyle.CARTOON);
   const [quality, setQuality] = useState<Quality>('Standard');
-  const [imageSize, setImageSize] = useState<ImageSize>('1K');
+  // Removed imageSize state
   const [customPrompt, setCustomPrompt] = useState<string>('');
   
-  // Selection & Tools State
+  // Tools
   const [activeTool, setActiveTool] = useState<Tool>(Tool.NONE);
   const [selection, setSelection] = useState<SelectionData | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPoints, setCurrentPoints] = useState<Point[]>([]); // For Pencil
-  const [startPoint, setStartPoint] = useState<Point | null>(null); // For Rect
+  const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+  const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [currentRect, setCurrentRect] = useState<{x:number, y:number, w:number, h:number} | null>(null);
 
-  // New Tool Settings
+  // Tool Settings
   const [brushSize, setBrushSize] = useState<number>(30);
   const [brushHardness, setBrushHardness] = useState<number>(80);
   const [stampScale, setStampScale] = useState<number>(1);
@@ -45,7 +45,7 @@ const App: React.FC = () => {
   const [stampSource, setStampSource] = useState<HTMLImageElement | null>(null);
   const [lastPos, setLastPos] = useState<Point | null>(null);
 
-  // App State misc
+  // App Misc
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,81 +53,57 @@ const App: React.FC = () => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Custom Settings (Provider, Key, URL)
+  // Settings
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-  
-  // PWA Install State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
   
   // Refs
-  const canvasRef = useRef<HTMLCanvasElement>(null); // For post-processing edits
-  const mainCanvasRef = useRef<HTMLCanvasElement>(null); // Main editing canvas (replaces img)
-  const selectionCanvasRef = useRef<HTMLCanvasElement>(null); // Overlay for drawing selection/cursor
-  const imageRef = useRef<HTMLImageElement>(null); // HIDDEN reference img to hold source data if needed
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mainCanvasRef = useRef<HTMLCanvasElement>(null);
+  const selectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const refInputRef = useRef<HTMLInputElement>(null); // For additional photos
+  const refInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Computed Properties ---
-  
-  // Determine what image is currently being shown on the main canvas
   const currentDisplayImage = activeReferenceId 
     ? referenceImages.find(r => r.id === activeReferenceId)?.originalUrl || null 
     : originalImage;
   
   const showEnglishHint = appSettings && ['pollinations', 'stability', 'huggingface'].includes(appSettings.provider);
 
-  // Load history on mount & Setup PWA & API Key
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load Settings
         const savedSettings = localStorage.getItem('app_settings');
         if (savedSettings) {
-            try {
-                setAppSettings(JSON.parse(savedSettings));
-            } catch (e) { console.error("Error parsing settings", e); }
+            try { setAppSettings(JSON.parse(savedSettings)); } catch (e) {}
         } else {
-             // Fallback for migration: check for old single key
              const oldKey = localStorage.getItem('user_api_key');
-             if (oldKey) {
-                 setAppSettings({ provider: 'gemini', apiKey: oldKey });
-             }
+             if (oldKey) { setAppSettings({ provider: 'gemini', apiKey: oldKey }); }
         }
-
-        // Load History
         const localSaved = localStorage.getItem('caricature_history');
         if (localSaved) {
            const items: HistoryItem[] = JSON.parse(localSaved);
-           for (const item of items) {
-             await saveHistoryItem(item);
-           }
+           for (const item of items) await saveHistoryItem(item);
            localStorage.removeItem('caricature_history');
         }
         const items = await getHistoryItems();
         setHistory(items);
-      } catch (e) {
-        console.error("Failed to load data", e);
-      }
+      } catch (e) { console.error("Failed to load data", e); }
     };
     loadData();
 
-    // Listen for PWA install prompt (Android/Desktop)
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
+      e.preventDefault(); setInstallPrompt(e);
     };
-
-    // Detect iOS
     const checkIOS = () => {
       const userAgent = window.navigator.userAgent.toLowerCase();
-      const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+      const isIos = /iphone|ipad|ipod/.test(userAgent);
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-      if (isIosDevice && !isStandalone) setIsIOS(true);
+      if (isIos && !isStandalone) setIsIOS(true);
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     checkIOS();
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -137,9 +113,7 @@ const App: React.FC = () => {
     if (!installPrompt) return;
     installPrompt.prompt();
     installPrompt.userChoice.then((choiceResult: any) => {
-      if (choiceResult.outcome === 'accepted') {
-        setInstallPrompt(null);
-      }
+      if (choiceResult.outcome === 'accepted') setInstallPrompt(null);
     });
   };
 
@@ -147,7 +121,6 @@ const App: React.FC = () => {
       setAppSettings(settings);
       if (settings) {
           localStorage.setItem('app_settings', JSON.stringify(settings));
-          // cleanup old legacy key
           localStorage.removeItem('user_api_key');
       } else {
           localStorage.removeItem('app_settings');
@@ -156,30 +129,18 @@ const App: React.FC = () => {
 
   const goHome = () => {
       if (window.confirm("Вернуться на главный экран? Текущий прогресс будет потерян.")) {
-          setOriginalImage(null);
-          setRawBase64(null);
-          setGeneratedImage(null);
-          setState(AppState.IDLE);
-          setReferenceImages([]);
-          setActiveReferenceId(null);
-          setSelection(null);
-          setError(null);
-          setIsEditing(false);
-          setStampSource(null);
+          setOriginalImage(null); setRawBase64(null); setGeneratedImage(null);
+          setState(AppState.IDLE); setReferenceImages([]); setActiveReferenceId(null);
+          setSelection(null); setError(null); setIsEditing(false); setStampSource(null);
       }
   };
 
   const handleExit = () => {
       if (window.confirm("Выйти из приложения?")) {
-          window.close();
-          // Fallback if window.close() fails (browsers often block it)
-          window.location.reload(); 
+          window.close(); window.location.reload(); 
       }
   };
 
-  // --- Canvas Rendering Logic ---
-
-  // Load the current image into the Main Canvas whenever it changes
   useEffect(() => {
     if (currentDisplayImage && mainCanvasRef.current) {
         const img = new Image();
@@ -191,348 +152,176 @@ const App: React.FC = () => {
                 mainCanvasRef.current.height = img.naturalHeight;
                 selectionCanvasRef.current.width = img.naturalWidth;
                 selectionCanvasRef.current.height = img.naturalHeight;
-                
                 const ctx = mainCanvasRef.current.getContext('2d');
-                if (ctx) {
-                    ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height);
-                    ctx.drawImage(img, 0, 0);
-                }
-                // Also store in hidden ref for utility access
+                if (ctx) { ctx.clearRect(0,0, ctx.canvas.width, ctx.canvas.height); ctx.drawImage(img, 0, 0); }
                 if (imageRef.current) imageRef.current.src = currentDisplayImage;
             }
         };
     }
-  }, [currentDisplayImage, activeReferenceId]); // Re-run when switching images
+  }, [currentDisplayImage, activeReferenceId]);
 
-  // Helper: Get coordinates relative to the canvas natural size
   const getCoords = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     if (!mainCanvasRef.current || !selectionCanvasRef.current) return null;
-    
     const rect = selectionCanvasRef.current.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    
-    // Position on the displayed canvas
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    // Scale to natural image size
     const scaleX = mainCanvasRef.current.width / rect.width;
     const scaleY = mainCanvasRef.current.height / rect.height;
-
-    return {
-      x: x * scaleX,
-      y: y * scaleY
-    };
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   };
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (activeTool === Tool.NONE) return;
-    // Prevent scroll ONLY if we are using a tool
     if (e.cancelable) e.preventDefault(); 
-    
     const coords = getCoords(e);
     if (!coords) return;
-
-    setIsDrawing(true);
-    setLastPos(coords);
-
-    if (activeTool === Tool.PENCIL) {
-        setSelection(null);
-        setCurrentPoints([coords]);
-    } else if (activeTool === Tool.RECTANGLE) {
-        setSelection(null);
-        setStartPoint(coords);
-        setCurrentRect({ x: coords.x, y: coords.y, w: 0, h: 0 });
-    } else if (activeTool === Tool.ERASER) {
-        erase(coords);
-    } else if (activeTool === Tool.STAMP) {
-        if (stampSource) {
-            applyStamp(coords);
-        }
-    }
+    setIsDrawing(true); setLastPos(coords);
+    if (activeTool === Tool.PENCIL) { setSelection(null); setCurrentPoints([coords]); }
+    else if (activeTool === Tool.RECTANGLE) { setSelection(null); setStartPoint(coords); setCurrentRect({ x: coords.x, y: coords.y, w: 0, h: 0 }); }
+    else if (activeTool === Tool.ERASER) { erase(coords); }
+    else if (activeTool === Tool.STAMP && stampSource) { applyStamp(coords); }
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     const coords = getCoords(e);
     if (!coords) return;
-
-    // Always update overlay for tool preview (cursor)
     renderSelectionOverlay(coords);
-
     if (!isDrawing) return;
     if (e.cancelable) e.preventDefault();
-
-    if (activeTool === Tool.PENCIL) {
-      setCurrentPoints(prev => [...prev, coords]);
-    } else if (activeTool === Tool.RECTANGLE && startPoint) {
-      const w = coords.x - startPoint.x;
-      const h = coords.y - startPoint.y;
-      setCurrentRect({
-        x: w < 0 ? startPoint.x + w : startPoint.x,
-        y: h < 0 ? startPoint.y + h : startPoint.y,
-        w: Math.abs(w),
-        h: Math.abs(h)
-      });
-    } else if (activeTool === Tool.ERASER) {
-        erase(coords);
-        setLastPos(coords);
-    } else if (activeTool === Tool.STAMP && stampSource) {
-        // Optional: Drag to paint stamps? usually single click
-    }
+    if (activeTool === Tool.PENCIL) { setCurrentPoints(prev => [...prev, coords]); }
+    else if (activeTool === Tool.RECTANGLE && startPoint) {
+      const w = coords.x - startPoint.x; const h = coords.y - startPoint.y;
+      setCurrentRect({ x: w < 0 ? startPoint.x + w : startPoint.x, y: h < 0 ? startPoint.y + h : startPoint.y, w: Math.abs(w), h: Math.abs(h) });
+    } else if (activeTool === Tool.ERASER) { erase(coords); setLastPos(coords); }
   };
 
   const stopDrawing = () => {
     if (!isDrawing) return;
-    setIsDrawing(false);
-    setLastPos(null);
-
-    if (activeTool === Tool.PENCIL && currentPoints.length > 2) {
-      setSelection({
-        type: Tool.PENCIL,
-        points: [...currentPoints]
-      });
-    } else if (activeTool === Tool.RECTANGLE && currentRect && currentRect.w > 0 && currentRect.h > 0) {
-      setSelection({
-        type: Tool.RECTANGLE,
-        points: [],
-        rect: currentRect
-      });
-    } else if (activeTool === Tool.ERASER || activeTool === Tool.STAMP) {
-        saveCanvasToState();
-    }
+    setIsDrawing(false); setLastPos(null);
+    if (activeTool === Tool.PENCIL && currentPoints.length > 2) { setSelection({ type: Tool.PENCIL, points: [...currentPoints] }); }
+    else if (activeTool === Tool.RECTANGLE && currentRect && currentRect.w > 0 && currentRect.h > 0) { setSelection({ type: Tool.RECTANGLE, points: [], rect: currentRect }); }
+    else if (activeTool === Tool.ERASER || activeTool === Tool.STAMP) { saveCanvasToState(); }
   };
 
-  // --- Eraser Logic ---
   const erase = (pos: Point) => {
       if (!mainCanvasRef.current) return;
-      const ctx = mainCanvasRef.current.getContext('2d');
-      if (!ctx) return;
-
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.beginPath();
-      if (lastPos) {
-          ctx.moveTo(lastPos.x, lastPos.y);
-          ctx.lineTo(pos.x, pos.y);
-      } else {
-          ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
-      }
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      if (brushHardness < 100) {
-          ctx.shadowBlur = brushSize * ((100 - brushHardness) / 100);
-          ctx.shadowColor = 'black';
-      }
-      ctx.stroke();
-      if (!lastPos) ctx.fill(); 
-      ctx.restore();
+      const ctx = mainCanvasRef.current.getContext('2d'); if (!ctx) return;
+      ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath();
+      if (lastPos) { ctx.moveTo(lastPos.x, lastPos.y); ctx.lineTo(pos.x, pos.y); } else { ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2); }
+      ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (brushHardness < 100) { ctx.shadowBlur = brushSize * ((100 - brushHardness) / 100); ctx.shadowColor = 'black'; }
+      ctx.stroke(); if (!lastPos) ctx.fill(); ctx.restore();
   };
 
-  // --- Stamp Logic ---
   const applyStamp = (pos: Point) => {
       if (!mainCanvasRef.current || !stampSource) return;
-      const ctx = mainCanvasRef.current.getContext('2d');
-      if (!ctx) return;
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-      ctx.rotate((stampRotation * Math.PI) / 180);
-      ctx.scale(stampScale, stampScale);
-      ctx.drawImage(stampSource, -stampSource.width / 2, -stampSource.height / 2);
-      ctx.restore();
+      const ctx = mainCanvasRef.current.getContext('2d'); if (!ctx) return;
+      ctx.save(); ctx.translate(pos.x, pos.y); ctx.rotate((stampRotation * Math.PI) / 180); ctx.scale(stampScale, stampScale);
+      ctx.drawImage(stampSource, -stampSource.width / 2, -stampSource.height / 2); ctx.restore();
   };
 
-  // Capture selection as stamp
   const captureStamp = async () => {
       if (!selection || !mainCanvasRef.current) return;
-      
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
+      const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); if (!ctx) return;
       let x=0, y=0, w=0, h=0;
       if (selection.type === Tool.RECTANGLE && selection.rect) { ({x, y, w, h} = selection.rect); }
       else if (selection.type === Tool.PENCIL && selection.points.length > 0) {
-        const xs = selection.points.map(p => p.x);
-        const ys = selection.points.map(p => p.y);
+        const xs = selection.points.map(p => p.x); const ys = selection.points.map(p => p.y);
         x = Math.min(...xs); y = Math.min(...ys); w = Math.max(...xs)-x; h = Math.max(...ys)-y;
       }
       if (w <= 0 || h <= 0) return;
-
-      canvas.width = w;
-      canvas.height = h;
-
+      canvas.width = w; canvas.height = h;
       if (selection.type === Tool.PENCIL && selection.points.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(selection.points[0].x - x, selection.points[0].y - y);
-        selection.points.forEach(p => ctx.lineTo(p.x - x, p.y - y));
-        ctx.closePath();
-        ctx.clip();
+        ctx.beginPath(); ctx.moveTo(selection.points[0].x - x, selection.points[0].y - y);
+        selection.points.forEach(p => ctx.lineTo(p.x - x, p.y - y)); ctx.closePath(); ctx.clip();
       }
-
       ctx.drawImage(mainCanvasRef.current, x, y, w, h, 0, 0, w, h);
-      const img = new Image();
-      img.src = canvas.toDataURL();
-      await new Promise(r => img.onload = r);
-      setStampSource(img);
-      setSelection(null); // Clear selection after capture
-      setActiveTool(Tool.STAMP);
+      const img = new Image(); img.src = canvas.toDataURL(); await new Promise(r => img.onload = r);
+      setStampSource(img); setSelection(null); setActiveTool(Tool.STAMP);
   };
 
   const saveCanvasToState = () => {
       if (!mainCanvasRef.current) return;
       const newDataUrl = mainCanvasRef.current.toDataURL(mimeType);
       const saveMime = (activeTool === Tool.ERASER || activeTool === Tool.STAMP) ? 'image/png' : mimeType;
-
-      if (activeReferenceId) {
-          setReferenceImages(prev => prev.map(r => r.id === activeReferenceId ? { ...r, originalUrl: newDataUrl, mimeType: saveMime, base64: newDataUrl.split(',')[1] } : r));
-      } else {
-          setOriginalImage(newDataUrl);
-          setRawBase64(newDataUrl.split(',')[1]);
-          if (saveMime === 'image/png') setMimeType('image/png');
-      }
+      if (activeReferenceId) { setReferenceImages(prev => prev.map(r => r.id === activeReferenceId ? { ...r, originalUrl: newDataUrl, mimeType: saveMime, base64: newDataUrl.split(',')[1] } : r)); }
+      else { setOriginalImage(newDataUrl); setRawBase64(newDataUrl.split(',')[1]); if (saveMime === 'image/png') setMimeType('image/png'); }
   };
 
-  // --- Overlay Rendering ---
   const renderSelectionOverlay = (cursorPos?: Point) => {
-    const canvas = selectionCanvasRef.current;
-    if (!canvas || !mainCanvasRef.current) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+    const canvas = selectionCanvasRef.current; if (!canvas || !mainCanvasRef.current) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     const pointsToDraw = isDrawing ? currentPoints : selection?.points;
     const rectToDraw = isDrawing ? currentRect : selection?.rect;
     const toolToDraw = isDrawing ? activeTool : selection?.type;
-    const isSelectionTool = activeTool === Tool.PENCIL || activeTool === Tool.RECTANGLE || activeTool === Tool.NONE;
     
-    if (selection || (isDrawing && isSelectionTool)) {
-        ctx.lineWidth = 4 * (canvas.width / 1000); 
-        ctx.strokeStyle = '#4ECDC4'; 
-        ctx.fillStyle = 'rgba(78, 205, 196, 0.3)';
-
-        if ((toolToDraw === Tool.PENCIL || selection?.type === Tool.PENCIL) && pointsToDraw && pointsToDraw.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
-            for (let i = 1; i < pointsToDraw.length; i++) {
-                ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
-            }
-            if (!isDrawing) ctx.closePath(); 
-            ctx.stroke();
-            ctx.fill();
-        } else if ((toolToDraw === Tool.RECTANGLE || selection?.type === Tool.RECTANGLE) && rectToDraw) {
-            ctx.fillRect(rectToDraw.x, rectToDraw.y, rectToDraw.w, rectToDraw.h);
-            ctx.strokeRect(rectToDraw.x, rectToDraw.y, rectToDraw.w, rectToDraw.h);
+    if (selection || (isDrawing && (activeTool === Tool.PENCIL || activeTool === Tool.RECTANGLE))) {
+        ctx.lineWidth = 4 * (canvas.width / 1000); ctx.strokeStyle = '#4ECDC4'; ctx.fillStyle = 'rgba(78, 205, 196, 0.3)';
+        if ((toolToDraw === Tool.PENCIL) && pointsToDraw && pointsToDraw.length > 0) {
+            ctx.beginPath(); ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+            for (let i = 1; i < pointsToDraw.length; i++) ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+            if (!isDrawing) ctx.closePath(); ctx.stroke(); ctx.fill();
+        } else if ((toolToDraw === Tool.RECTANGLE) && rectToDraw) {
+            ctx.fillRect(rectToDraw.x, rectToDraw.y, rectToDraw.w, rectToDraw.h); ctx.strokeRect(rectToDraw.x, rectToDraw.y, rectToDraw.w, rectToDraw.h);
         }
     }
-
     if (cursorPos && !isDrawing) { 
         if (activeTool === Tool.ERASER) {
-            ctx.beginPath();
-            ctx.arc(cursorPos.x, cursorPos.y, brushSize / 2, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(cursorPos.x, cursorPos.y, brushSize / 2, 0, Math.PI * 2);
-            ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.beginPath(); ctx.arc(cursorPos.x, cursorPos.y, brushSize / 2, 0, Math.PI * 2); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath(); ctx.arc(cursorPos.x, cursorPos.y, brushSize / 2, 0, Math.PI * 2); ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.stroke();
         } else if (activeTool === Tool.STAMP && stampSource) {
-            ctx.save();
-            ctx.globalAlpha = 0.6;
-            ctx.translate(cursorPos.x, cursorPos.y);
-            ctx.rotate((stampRotation * Math.PI) / 180);
-            ctx.scale(stampScale, stampScale);
-            ctx.drawImage(stampSource, -stampSource.width / 2, -stampSource.height / 2);
-            ctx.restore();
+            ctx.save(); ctx.globalAlpha = 0.6; ctx.translate(cursorPos.x, cursorPos.y); ctx.rotate((stampRotation * Math.PI) / 180);
+            ctx.scale(stampScale, stampScale); ctx.drawImage(stampSource, -stampSource.width / 2, -stampSource.height / 2); ctx.restore();
         }
     }
   };
 
-  useEffect(() => {
-    renderSelectionOverlay();
-  }, [selection, currentPoints, currentRect, activeTool]);
-
-  // --- Image Handling Logic ---
+  useEffect(() => { renderSelectionOverlay(); }, [selection, currentPoints, currentRect, activeTool]);
 
   const addToHistory = async (imageUrl: string, style: ArtStyle) => {
     const newItem: HistoryItem = { id: Date.now().toString(), url: imageUrl, style, timestamp: Date.now() };
-    try {
-      await saveHistoryItem(newItem);
-      const items = await getHistoryItems();
-      setHistory(items);
-    } catch (e) { console.error("Failed to save history", e); }
+    try { await saveHistoryItem(newItem); const items = await getHistoryItems(); setHistory(items); } catch (e) { console.error(e); }
   };
 
   const handleMainFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setError("Пожалуйста, загрузите корректный файл изображения."); return; }
-
+    const file = event.target.files?.[0]; if (!file) return;
+    if (!file.type.startsWith('image/')) { setError("Некорректный файл."); return; }
     try {
-      const previewUrl = URL.createObjectURL(file);
-      setOriginalImage(previewUrl);
+      setOriginalImage(URL.createObjectURL(file));
       const base64 = await fileToBase64(file);
-      setRawBase64(base64);
-      setMimeType(file.type);
-      setGeneratedImage(null); setError(null); setState(AppState.IDLE);
+      setRawBase64(base64); setMimeType(file.type); setGeneratedImage(null); setError(null); setState(AppState.IDLE);
       setIsEditing(false); setSelection(null); setReferenceImages([]); setActiveReferenceId(null); setStampSource(null);
-    } catch (err) { console.error(err); setError("Ошибка при обработке изображения."); }
+    } catch (err) { console.error(err); setError("Ошибка обработки."); }
   };
 
   const handleTextMode = async () => {
-      // Create a white 1024x1024 canvas for text-to-image mode
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1024;
+      const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, 1024, 1024);
-          
-          // Optional: Draw some faint text to indicate it's a canvas
-          ctx.fillStyle = '#f3f4f6';
-          ctx.font = 'bold 40px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
+          ctx.fillStyle = '#f3f4f6'; ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText('Холст для описания', 512, 512);
-
           const dataUrl = canvas.toDataURL('image/jpeg');
-          setOriginalImage(dataUrl);
-          setRawBase64(dataUrl.split(',')[1]);
-          setMimeType('image/jpeg');
-          setGeneratedImage(null);
-          setError(null);
-          setState(AppState.IDLE);
-          setIsEditing(false);
-          setSelection(null); 
-          setReferenceImages([]); 
-          setActiveReferenceId(null); 
-          setStampSource(null);
-          setCustomPrompt("Смешная карикатура на..."); // Pre-fill to guide user in Russian
+          setOriginalImage(dataUrl); setRawBase64(dataUrl.split(',')[1]); setMimeType('image/jpeg');
+          setGeneratedImage(null); setError(null); setState(AppState.IDLE); setIsEditing(false); setSelection(null); 
+          setReferenceImages([]); setActiveReferenceId(null); setStampSource(null); setCustomPrompt("Смешная карикатура на...");
       }
   };
 
   const handleReferenceFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    const file = event.target.files?.[0]; if (!file || !file.type.startsWith('image/')) return;
     try {
-        const previewUrl = URL.createObjectURL(file);
         const base64 = await fileToBase64(file);
-        const newRef: ReferenceImage = { id: Date.now().toString(), originalUrl: previewUrl, base64: base64, mimeType: file.type };
-        setReferenceImages(prev => [...prev, newRef]);
-    } catch (e) { console.error("Ref upload error", e); }
+        setReferenceImages(prev => [...prev, { id: Date.now().toString(), originalUrl: URL.createObjectURL(file), base64, mimeType: file.type }]);
+    } catch (e) { console.error(e); }
   };
 
-  const switchToImage = (id: string | null) => {
-      setSelection(null); setActiveTool(Tool.NONE); setActiveReferenceId(id);
-  };
+  const switchToImage = (id: string | null) => { setSelection(null); setActiveTool(Tool.NONE); setActiveReferenceId(id); };
 
   const getCroppedBase64 = async (): Promise<string | null> => {
     if (!selection || !mainCanvasRef.current) return null;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
+    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); if (!ctx) return null;
     let x=0, y=0, w=0, h=0;
     if (selection.type === Tool.RECTANGLE && selection.rect) { ({x, y, w, h} = selection.rect); }
     else if (selection.type === Tool.PENCIL && selection.points.length > 0) {
@@ -541,13 +330,9 @@ const App: React.FC = () => {
     }
     if (w <= 0 || h <= 0) return null;
     canvas.width = w; canvas.height = h;
-
     if (selection.type === Tool.PENCIL && selection.points.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(selection.points[0].x - x, selection.points[0].y - y);
-        selection.points.forEach(p => ctx.lineTo(p.x - x, p.y - y));
-        ctx.closePath();
-        ctx.clip();
+        ctx.beginPath(); ctx.moveTo(selection.points[0].x - x, selection.points[0].y - y);
+        selection.points.forEach(p => ctx.lineTo(p.x - x, p.y - y)); ctx.closePath(); ctx.clip();
     }
     ctx.drawImage(mainCanvasRef.current, x, y, w, h, 0, 0, w, h);
     const activeRef = referenceImages.find(r => r.id === activeReferenceId);
@@ -555,27 +340,19 @@ const App: React.FC = () => {
   };
 
   const handleApplyCropToReference = async () => {
-     if (!activeReferenceId) return;
-     const cropped = await getCroppedBase64();
-     if (cropped) {
-         setReferenceImages(prev => prev.map(r => r.id === activeReferenceId ? { ...r, croppedBase64: cropped } : r));
-         setSelection(null); setActiveTool(Tool.NONE);
-     }
+     if (!activeReferenceId) return; const cropped = await getCroppedBase64();
+     if (cropped) { setReferenceImages(prev => prev.map(r => r.id === activeReferenceId ? { ...r, croppedBase64: cropped } : r)); setSelection(null); setActiveTool(Tool.NONE); }
   };
 
   const handleDeleteReference = (e: React.MouseEvent, id: string) => {
-      e.stopPropagation(); setReferenceImages(prev => prev.filter(r => r.id !== id));
-      if (activeReferenceId === id) switchToImage(null);
+      e.stopPropagation(); setReferenceImages(prev => prev.filter(r => r.id !== id)); if (activeReferenceId === id) switchToImage(null);
   };
 
   const handleGenerateAndSave = async () => {
     if (!rawBase64) return;
     setState(AppState.LOADING); setError(null); setIsEditing(false);
-
     try {
-      let mainInputBase64 = rawBase64;
-      let cropInfo = null;
-
+      let mainInputBase64 = rawBase64; let cropInfo = null;
       if (!activeReferenceId && selection) {
         const img = mainCanvasRef.current;
         if (img) {
@@ -586,393 +363,88 @@ const App: React.FC = () => {
                 x = Math.min(...xs); y = Math.min(...ys); w = Math.max(...xs)-x; h = Math.max(...ys)-y;
             }
             if (w > 0 && h > 0) {
-                 const canvas = document.createElement('canvas');
-                 canvas.width = w; canvas.height = h;
+                 const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
                  const ctx = canvas.getContext('2d');
-                 if (ctx) {
-                    ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
-                    mainInputBase64 = canvas.toDataURL(mimeType).split(',')[1];
-                    cropInfo = { x, y, w, h };
-                 }
+                 if (ctx) { ctx.drawImage(img, x, y, w, h, 0, 0, w, h); mainInputBase64 = canvas.toDataURL(mimeType).split(',')[1]; cropInfo = { x, y, w, h }; }
             }
         }
       }
 
-      const resultUrl = await generateCaricature(
-          mainInputBase64, 
-          selectedStyle, 
-          customPrompt, 
-          referenceImages, 
-          quality, 
-          mimeType,
-          appSettings, // Pass full settings object
-          imageSize // Pass selected image size (1K, 2K, 4K)
-      );
+      const resultUrl = await generateCaricature(mainInputBase64, selectedStyle, customPrompt, referenceImages, quality, mimeType, appSettings);
       
       let finalResultUrl = resultUrl;
-
-      // Composite back if Main was cropped (Only for Gemini or services that respect input pixels exactly same size)
-      // DALL-E 3 returns 1024x1024 always, so this might skew if we used DALL-E.
-      // We should check if result dimensions match crop. But simpler: just show result.
-      // Actually, if we crop, we usually want the result to replace that area.
-      // But since non-Gemini services might return totally different images, let's only do composite if provider is Gemini.
       const isGemini = !appSettings || appSettings.provider === 'gemini';
-
       if (cropInfo && !activeReferenceId && originalImage && isGemini) {
           const mainImgObj = new Image(); mainImgObj.src = originalImage; await new Promise(r => mainImgObj.onload = r);
-          const finalCanvas = document.createElement('canvas');
-          finalCanvas.width = mainImgObj.naturalWidth; finalCanvas.height = mainImgObj.naturalHeight;
+          const finalCanvas = document.createElement('canvas'); finalCanvas.width = mainImgObj.naturalWidth; finalCanvas.height = mainImgObj.naturalHeight;
           const ctx = finalCanvas.getContext('2d');
           if (ctx) {
-             ctx.drawImage(mainImgObj, 0, 0);
-             const genImgObj = new Image(); genImgObj.src = resultUrl; await new Promise(r => genImgObj.onload = r);
+             ctx.drawImage(mainImgObj, 0, 0); const genImgObj = new Image(); genImgObj.src = resultUrl; await new Promise(r => genImgObj.onload = r);
              ctx.save(); ctx.beginPath();
              if (selection?.type === Tool.RECTANGLE && selection.rect) { ctx.rect(selection.rect.x, selection.rect.y, selection.rect.w, selection.rect.h); }
              else if (selection?.type === Tool.PENCIL && selection.points.length > 0) {
-                ctx.moveTo(selection.points[0].x, selection.points[0].y);
-                selection.points.forEach(p => ctx.lineTo(p.x, p.y));
-                ctx.closePath();
+                ctx.moveTo(selection.points[0].x, selection.points[0].y); selection.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
              }
-             ctx.clip();
-             ctx.drawImage(genImgObj, cropInfo.x, cropInfo.y, cropInfo.w, cropInfo.h);
-             ctx.restore();
+             ctx.clip(); ctx.drawImage(genImgObj, cropInfo.x, cropInfo.y, cropInfo.w, cropInfo.h); ctx.restore();
              finalResultUrl = finalCanvas.toDataURL(mimeType);
           }
       }
-
-      setGeneratedImage(finalResultUrl);
-      setState(AppState.SUCCESS);
-      await addToHistory(finalResultUrl, selectedStyle);
-
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Ошибка генерации");
-      setState(AppState.ERROR);
-    }
+      setGeneratedImage(finalResultUrl); setState(AppState.SUCCESS); await addToHistory(finalResultUrl, selectedStyle);
+    } catch (err: any) { console.error(err); setError(err.message || "Ошибка генерации"); setState(AppState.ERROR); }
   };
 
-  const handleQuickDownload = () => {
-    if (!generatedImage) return;
-    const link = document.createElement('a'); link.href = generatedImage; link.download = `caricature-${Date.now()}.png`;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  };
-
-  const handleShare = async () => {
-    if (!generatedImage) return;
-    try {
-        const response = await fetch(generatedImage);
-        const blob = await response.blob();
-        const file = new File([blob], 'caricature.png', { type: 'image/png' });
-        
-        if (navigator.share) {
-            await navigator.share({
-                title: 'Моя карикатура AI',
-                text: 'Смотри, какую классную карикатуру я сделал с помощью ИИ!',
-                files: [file],
-            });
-        } else {
-            alert('Ваш браузер не поддерживает функцию "Поделиться". Скачайте изображение и отправьте его вручную.');
-        }
-    } catch (error) {
-        console.error('Sharing failed', error);
-        alert('Не удалось поделиться изображением.');
-    }
-  };
-
-  const handleSaveAs = async (filename: string, format: 'png' | 'jpeg') => {
-    if (!generatedImage) return;
-    const img = new Image(); img.src = generatedImage;
-    await new Promise((resolve) => { if (img.complete) resolve(true); img.onload = () => resolve(true); });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        if (format === 'jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
-        if (isEditing) { ctx.filter = `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)`; }
-        ctx.drawImage(img, 0, 0);
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.9);
-        link.download = `${filename || 'caricature'}.${format}`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        setIsSaveModalOpen(false);
-    }
-  };
-
-  const handleSaveEdits = async () => {
-    if (!generatedImage || !canvasRef.current) return;
-    const img = new Image(); img.src = generatedImage;
-    img.onload = async () => {
-      const canvas = canvasRef.current!; const ctx = canvas.getContext('2d'); if (!ctx) return;
-      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-      ctx.filter = `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)`;
-      ctx.drawImage(img, 0, 0);
-      const editedDataUrl = canvas.toDataURL('image/png');
-      setGeneratedImage(editedDataUrl); setIsEditing(false); await addToHistory(editedDataUrl, selectedStyle);
-    };
-  };
-
-  const loadFromHistory = (item: HistoryItem) => {
-    // 1. Set the history image as the SOURCE (Original) image so the Editor UI appears
-    setOriginalImage(item.url);
-    
-    // 2. We need to populate rawBase64 for the generator to work if user clicks "Generate" again
-    // History URLs are usually data URLs (data:image/png;base64,...)
-    if (item.url.includes(',')) {
-        setRawBase64(item.url.split(',')[1]);
-    } else {
-        setRawBase64(item.url);
-    }
-    
-    setMimeType('image/png'); // History items are usually PNG
-
-    // 3. Reset state to IDLE so we see the canvas, not the "Success" result view immediately
-    // or we can set it to IDLE to allow further editing. 
-    // If we want to just SHOW the result, we would keep SUCCESS. 
-    // But user asked to "Edit", so we treat it as a fresh start with this image.
-    setGeneratedImage(null); 
-    setState(AppState.IDLE);
-    
-    setReferenceImages([]); 
-    setActiveReferenceId(null); 
-    setSelection(null);
-    setStampSource(null);
-    setCustomPrompt('');
-    
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const handleQuickDownload = () => { if (!generatedImage) return; const link = document.createElement('a'); link.href = generatedImage; link.download = `caricature-${Date.now()}.png`; document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+  const handleShare = async () => { if (!generatedImage) return; try { const res = await fetch(generatedImage); const blob = await res.blob(); await navigator.share({ title: 'Карикатура', files: [new File([blob], 'caricature.png', { type: 'image/png' })] }); } catch (e) { alert('Не удалось поделиться.'); } };
+  const handleSaveAs = async (filename: string, format: 'png' | 'jpeg') => { if (!generatedImage) return; const img = new Image(); img.src = generatedImage; await new Promise(r => img.onload = r); const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); if (ctx) { if (format === 'jpeg') { ctx.fillStyle='#FFF'; ctx.fillRect(0,0,canvas.width,canvas.height); } if (isEditing) ctx.filter = `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)`; ctx.drawImage(img, 0, 0); const link = document.createElement('a'); link.href = canvas.toDataURL(`image/${format}`); link.download = `${filename}.${format}`; document.body.appendChild(link); link.click(); document.body.removeChild(link); setIsSaveModalOpen(false); } };
+  const handleSaveEdits = async () => { if (!generatedImage || !canvasRef.current) return; const img = new Image(); img.src = generatedImage; img.onload = async () => { const canvas = canvasRef.current!; const ctx = canvas.getContext('2d'); if (!ctx) return; canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; ctx.filter = `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)`; ctx.drawImage(img, 0, 0); const res = canvas.toDataURL('image/png'); setGeneratedImage(res); setIsEditing(false); await addToHistory(res, selectedStyle); }; };
+  const loadFromHistory = (item: HistoryItem) => { setOriginalImage(item.url); if (item.url.includes(',')) setRawBase64(item.url.split(',')[1]); else setRawBase64(item.url); setMimeType('image/png'); setGeneratedImage(null); setState(AppState.IDLE); setReferenceImages([]); setActiveReferenceId(null); setSelection(null); setStampSource(null); setCustomPrompt(''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   return (
     <div className="min-h-screen bg-gray-50 text-dark font-sans selection:bg-primary selection:text-white pb-32 lg:pb-12 overflow-x-hidden">
       <SaveModal isOpen={isSaveModalOpen} onClose={() => setIsSaveModalOpen(false)} onSave={handleSaveAs} />
-      
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSettingsChange={handleSettingsChange}
-        currentSettings={appSettings}
-      />
-
-      {/* Full Screen Image Modal */}
-      {fullScreenImage && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setFullScreenImage(null)}
-          style={{ touchAction: 'none' }}
-        >
-           <button onClick={() => setFullScreenImage(null)} className="absolute top-6 right-6 z-10 text-white/80 bg-white/10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-white/20 hover:text-white transition-all backdrop-blur-md border border-white/10">✕</button>
-           <img src={fullScreenImage} alt="Full Screen" className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} />
-           
-           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-4 pointer-events-none">
-              <div className="pointer-events-auto flex gap-4 w-full max-w-sm">
-                <Button variant="secondary" onClick={(e) => {
-                    e.stopPropagation();
-                    const link = document.createElement('a');
-                    link.href = fullScreenImage;
-                    link.download = `caricature-${Date.now()}.png`;
-                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50">
-                  📥 Скачать
-                </Button>
-                <Button onClick={(e) => {
-                    e.stopPropagation();
-                    const item = history.find(i => i.url === fullScreenImage);
-                    if (item) {
-                       loadFromHistory(item);
-                       setFullScreenImage(null);
-                    } else {
-                       // Fallback if trying to edit something not in history list yet
-                       // Treat fullscreen image as source
-                       setOriginalImage(fullScreenImage);
-                       if (fullScreenImage && fullScreenImage.includes(',')) {
-                           setRawBase64(fullScreenImage.split(',')[1]);
-                       }
-                       setGeneratedImage(null);
-                       setState(AppState.IDLE);
-                       setFullScreenImage(null);
-                       window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50 !bg-white !text-gray-900 hover:!bg-gray-100 border-none">
-                  ✏️ Редактор
-                </Button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm safe-top">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            {originalImage && (
-                <button 
-                  onClick={goHome} 
-                  className="p-2 mr-1 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" 
-                  title="На главную"
-                >
-                  🏠
-                </button>
-            )}
-            <span className="text-2xl">🎭</span>
-            <h1 className="text-xl font-comic font-bold text-gray-800 hidden sm:block">Карикатура AI</h1>
-            <h1 className="text-xl font-comic font-bold text-gray-800 sm:hidden">Карикатура</h1>
-          </div>
-          <div className="flex items-center gap-2">
-             <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" title="Настройки">⚙️</button>
-             <button onClick={handleExit} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors" title="Выход">🚪</button>
-             {installPrompt && (
-               <button onClick={handleInstallClick} className="hidden sm:flex bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold items-center gap-2 hover:bg-gray-800 transition-colors animate-pulse shadow-lg shadow-black/20"><span>⬇️</span> Установить</button>
-             )}
-          </div>
-        </div>
-        {installPrompt && (
-           <div className="sm:hidden bg-black text-white p-2 flex justify-between items-center px-4">
-              <span className="text-xs font-bold">Установите приложение!</span>
-              <button onClick={handleInstallClick} className="bg-white text-black px-3 py-1 rounded text-xs font-bold shadow-sm">Установить</button>
-           </div>
-        )}
-      </header>
-
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onSettingsChange={handleSettingsChange} currentSettings={appSettings} />
+      {fullScreenImage && <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={() => setFullScreenImage(null)}><button onClick={() => setFullScreenImage(null)} className="absolute top-6 right-6 z-10 text-white/80 text-4xl">✕</button><img src={fullScreenImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm" onClick={e => e.stopPropagation()} style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} /><div className="absolute bottom-6 flex gap-4 pointer-events-none"><div className="pointer-events-auto flex gap-4"><Button variant="secondary" onClick={(e) => { e.stopPropagation(); handleQuickDownload(); }}>📥 Скачать</Button><Button onClick={(e) => { e.stopPropagation(); loadFromHistory(history.find(i => i.url === fullScreenImage) || { id: '0', url: fullScreenImage, style: ArtStyle.NO_STYLE, timestamp: 0 }); setFullScreenImage(null); }} className="!bg-white !text-dark">✏️ Редактор</Button></div></div></div>}
+      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm safe-top"><div className="container mx-auto px-4 py-3 flex justify-between items-center"><div className="flex items-center gap-2">{originalImage && <button onClick={goHome} className="text-xl">🏠</button>}<span className="text-2xl">🎭</span><h1 className="text-xl font-comic font-bold text-gray-800">Карикатура AI</h1></div><div className="flex gap-2"><button onClick={() => setIsSettingsOpen(true)} className="text-xl">⚙️</button><button onClick={handleExit} className="text-xl">🚪</button>{installPrompt && <button onClick={handleInstallClick} className="bg-black text-white px-2 rounded text-xs">⬇️</button>}</div></div></header>
       <main className="container mx-auto px-4 py-6 max-w-5xl">
-        {state === AppState.IDLE && !originalImage && (
-          <div className="text-center py-12 space-y-6 flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="text-6xl mb-4 animate-bounce">🎨</div>
-            <h2 className="text-3xl md:text-5xl font-black text-gray-800 mb-2 leading-tight">Создайте свой <br /><span className="text-primary transform -rotate-2 inline-block">Шарж</span></h2>
-            <p className="text-lg text-gray-500 max-w-xs mx-auto">Загрузите фото, и искусственный интеллект превратит его в веселую карикатуру.</p>
-            <div className="pt-8 w-full max-w-sm flex flex-col gap-3">
-              <Button onClick={() => fileInputRef.current?.click()} className="w-full text-lg py-4 shadow-xl shadow-primary/20 rounded-2xl">Загрузить фото 📸</Button>
-              <Button onClick={handleTextMode} variant="secondary" className="w-full text-lg py-4 shadow-xl shadow-secondary/20 rounded-2xl">По описанию 📝</Button>
-            </div>
-          </div>
-        )}
-
-        <input type="file" ref={fileInputRef} onChange={handleMainFileChange} accept="image/*" className="hidden" />
-        <input type="file" ref={refInputRef} onChange={handleReferenceFileChange} accept="image/*" className="hidden" />
-
-        {originalImage && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-12">
+        {state === AppState.IDLE && !originalImage && <div className="text-center py-12 flex flex-col items-center justify-center min-h-[60vh]"><div className="text-6xl mb-4">🎨</div><h2 className="text-3xl font-black mb-2">Создайте свой <span className="text-primary">Шарж</span></h2><div className="pt-8 w-full max-w-sm flex flex-col gap-3"><Button onClick={() => fileInputRef.current?.click()}>Загрузить фото 📸</Button><Button onClick={handleTextMode} variant="secondary">По описанию 📝</Button></div></div>}
+        <input type="file" ref={fileInputRef} onChange={handleMainFileChange} accept="image/*" className="hidden" /><input type="file" ref={refInputRef} onChange={handleReferenceFileChange} accept="image/*" className="hidden" />
+        {originalImage && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-12">
             <div className="space-y-4">
-              <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 transition-colors ${activeReferenceId ? 'border-secondary/50 ring-2 ring-secondary/10' : 'border-gray-100'}`}>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-bold text-gray-700 text-sm">{activeReferenceId ? <span className="text-secondary flex items-center gap-2">✂️ Редактирование</span> : 'Холст'}</h3>
-                  {activeReferenceId ? <button onClick={() => switchToImage(null)} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg font-bold text-gray-600 transition-colors">Назад</button> : <div className="flex gap-2"><button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary font-bold bg-primary/10 px-2 py-1 rounded hover:bg-primary/20">Сменить</button></div>}
-                </div>
-
-                <div className="flex gap-2 mb-3 pb-2 overflow-x-auto no-scrollbar items-center">
-                    {[
-                        { t: Tool.NONE, i: '✋', title: 'Двигать' }, { t: Tool.PENCIL, i: '✏️', title: 'Лассо' },
-                        { t: Tool.RECTANGLE, i: '⬜', title: 'Прямоугольник' }, { t: Tool.ERASER, i: '🧼', title: 'Ластик' },
-                        { t: Tool.STAMP, i: '🥔', title: 'Штамп' },
-                    ].map(tool => (
-                        <button key={tool.t} onClick={() => { if (tool.t === Tool.STAMP && !stampSource && !selection) alert("Сначала выделите область"); else if (tool.t === Tool.STAMP && selection) captureStamp(); else setActiveTool(tool.t); }} className={`flex-shrink-0 w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all active:scale-95 ${activeTool === tool.t ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`} title={tool.title}>{tool.i}</button>
-                    ))}
-                    {selection && <><div className="w-px h-8 bg-gray-200 mx-1 flex-shrink-0"></div><button onClick={captureStamp} className="flex-shrink-0 text-xs font-bold bg-secondary text-white px-3 h-10 rounded-xl hover:bg-teal-500 shadow-sm">Создать штамп</button><button onClick={() => { setSelection(null); setActiveTool(Tool.NONE); }} className="flex-shrink-0 text-xs font-bold text-red-500 bg-red-50 px-3 h-10 rounded-xl hover:bg-red-100">Сброс</button></>}
-                </div>
-
-                {activeTool === Tool.ERASER && <div className="mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100 flex flex-col gap-2"><div className="flex items-center gap-3"><span className="text-xs font-bold text-gray-500 w-16">Размер</span><input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none accent-primary" /></div><div className="flex items-center gap-3"><span className="text-xs font-bold text-gray-500 w-16">Жесткость</span><input type="range" min="0" max="100" value={brushHardness} onChange={e => setBrushHardness(Number(e.target.value))} className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none accent-primary" /></div></div>}
-                {activeTool === Tool.STAMP && <div className="mb-3 p-3 bg-gray-50 rounded-xl border border-gray-100 flex flex-col gap-2"><div className="flex items-center gap-3"><span className="text-xs font-bold text-gray-500 w-16">Масштаб</span><input type="range" min="0.1" max="3" step="0.1" value={stampScale} onChange={e => setStampScale(Number(e.target.value))} className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none accent-secondary" /></div><div className="flex items-center gap-3"><span className="text-xs font-bold text-gray-500 w-16">Поворот</span><input type="range" min="0" max="360" value={stampRotation} onChange={e => setStampRotation(Number(e.target.value))} className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none accent-secondary" /></div>{!stampSource && <div className="text-xs text-red-400 mt-1">⚠️ Нет штампа</div>}</div>}
-
-                <div className={`relative w-full rounded-xl overflow-hidden bg-[url('https://t3.ftcdn.net/jpg/03/76/74/78/360_F_376747823_L8il80K6c0B8K47eqV8a6q8b75k4b8h0.jpg')] bg-repeat border-2 border-dashed border-gray-300 shadow-inner max-h-[60vh] lg:max-h-none`} style={{ backgroundSize: '16px 16px', touchAction: activeTool === Tool.NONE ? 'pan-y' : 'none' }} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}>
-                  <canvas ref={mainCanvasRef} className="w-full h-auto block select-none pointer-events-none" />
-                  <canvas ref={selectionCanvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ cursor: activeTool === Tool.NONE ? 'default' : 'none' }} />
-                  <img ref={imageRef} className="hidden" />
-                </div>
-                
-                {activeReferenceId && <div className="mt-3">{selection && <Button variant="secondary" onClick={handleApplyCropToReference} className="w-full py-3 text-sm rounded-xl">Подтвердить выделение ✅</Button>}</div>}
+              <div className={`bg-white rounded-2xl p-4 shadow-lg border-2 ${activeReferenceId ? 'border-secondary' : 'border-gray-100'}`}>
+                <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-sm">{activeReferenceId ? '✂️ Редактирование' : 'Холст'}</h3>{activeReferenceId ? <button onClick={() => switchToImage(null)} className="text-xs bg-gray-100 px-2 py-1 rounded">Назад</button> : <button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary font-bold bg-primary/10 px-2 py-1 rounded">Сменить</button>}</div>
+                <div className="flex gap-2 mb-3 pb-2 overflow-x-auto no-scrollbar">{[{t: Tool.NONE, i:'✋'}, {t:Tool.PENCIL, i:'✏️'}, {t:Tool.RECTANGLE, i:'⬜'}, {t:Tool.ERASER, i:'🧼'}, {t:Tool.STAMP, i:'🥔'}].map(tool => <button key={tool.t} onClick={() => setActiveTool(tool.t)} className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${activeTool === tool.t ? 'bg-dark text-white' : 'bg-gray-50'}`}>{tool.i}</button>)}{selection && <><div className="w-px h-8 bg-gray-200 mx-1"></div><button onClick={captureStamp} className="text-xs font-bold bg-secondary text-white px-2 rounded">Штамп</button><button onClick={() => { setSelection(null); setActiveTool(Tool.NONE); }} className="text-xs text-red-500">Сброс</button></>}</div>
+                {activeTool === Tool.ERASER && <div className="mb-3 p-2 bg-gray-50 rounded flex flex-col gap-2"><input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full accent-primary" /></div>}
+                {activeTool === Tool.STAMP && <div className="mb-3 p-2 bg-gray-50 rounded flex flex-col gap-2"><input type="range" min="0.1" max="3" step="0.1" value={stampScale} onChange={e => setStampScale(Number(e.target.value))} className="w-full accent-secondary" /><input type="range" min="0" max="360" value={stampRotation} onChange={e => setStampRotation(Number(e.target.value))} className="w-full accent-secondary" />{!stampSource && <div className="text-xs text-red-400">⚠️ Нет штампа</div>}</div>}
+                <div className="relative w-full rounded-xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-300" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} style={{ touchAction: activeTool === Tool.NONE ? 'pan-y' : 'none' }}><canvas ref={mainCanvasRef} className="w-full h-auto block select-none pointer-events-none" /><canvas ref={selectionCanvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" /><img ref={imageRef} className="hidden" /></div>
+                {activeReferenceId && selection && <Button variant="secondary" onClick={handleApplyCropToReference} className="w-full mt-3 py-2 text-sm">Подтвердить ✅</Button>}
               </div>
-              
-              <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100">
-                 <div className="flex justify-between items-center mb-3"><h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Доп. фото</h3><button onClick={() => refInputRef.current?.click()} className="text-xs bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-full font-bold text-dark transition-colors flex items-center gap-1 border border-gray-200"><span>+</span> Добавить</button></div>
-                 {referenceImages.length === 0 ? <div className="text-center py-4 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50/50"><p className="text-gray-400 text-xs">Загрузите фото объектов</p></div> : <div className="grid grid-cols-4 gap-2">{referenceImages.map((ref) => (<div key={ref.id} onClick={() => switchToImage(ref.id)} className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all active:scale-95 ${activeReferenceId === ref.id ? 'border-secondary ring-2 ring-secondary/30' : 'border-gray-100'}`}><img src={ref.originalUrl} className="w-full h-full object-cover" />{ref.croppedBase64 && <div className="absolute inset-0 bg-secondary/30 flex items-center justify-center backdrop-blur-[1px]"><span className="text-white text-[10px] font-bold">✂️</span></div>}<button onClick={(e) => handleDeleteReference(e, ref.id)} className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">×</button></div>))}</div>}
-              </div>
-
+              <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100"><div className="flex justify-between items-center mb-3"><h3 className="text-xs font-bold text-gray-400">ДОП. ФОТО</h3><button onClick={() => refInputRef.current?.click()} className="text-xs bg-gray-50 px-2 py-1 rounded font-bold">+ Добавить</button></div><div className="grid grid-cols-4 gap-2">{referenceImages.map(ref => <div key={ref.id} onClick={() => switchToImage(ref.id)} className={`relative aspect-square rounded overflow-hidden cursor-pointer border-2 ${activeReferenceId === ref.id ? 'border-secondary' : 'border-gray-100'}`}><img src={ref.originalUrl} className="w-full h-full object-cover" /><button onClick={e => handleDeleteReference(e, ref.id)} className="absolute top-0 right-0 bg-black/50 text-white w-4 h-4 flex items-center justify-center text-[10px]">×</button></div>)}</div></div>
               <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 space-y-5">
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Стиль</label><StyleSelector selectedStyle={selectedStyle} onSelect={setSelectedStyle} disabled={state === AppState.LOADING} /></div>
-                <div><label className="block text-sm font-bold text-gray-700 mb-2">Качество</label><div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">{(['Standard', 'High'] as Quality[]).map((q) => (<button key={q} onClick={() => setQuality(q)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${quality === q ? 'bg-white text-dark shadow-sm border border-gray-100' : 'text-gray-400'}`}>{q === 'Standard' ? 'Быстро' : 'HD (Высокое)'}</button>))}</div></div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Размер (Gemini)</label>
-                  <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
-                    {(['1K', '2K', '4K'] as ImageSize[]).map((s) => (
-                      <button key={s} onClick={() => setImageSize(s)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${imageSize === s ? 'bg-white text-dark shadow-sm border border-gray-100' : 'text-gray-400'}`}>{s}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                   <label htmlFor="custom-prompt" className="block text-sm font-bold text-gray-700 mb-2">Детали</label>
-                   <textarea id="custom-prompt" rows={3} value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder={referenceImages.length > 0 ? "Например: надень шляпу на голову..." : "Например: сделай фон космосом..."} className="w-full p-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-secondary focus:ring-2 focus:ring-secondary/10 transition-all outline-none resize-none text-sm placeholder-gray-400" />
-                   {showEnglishHint && <p className="text-[10px] text-orange-500 mt-1 font-bold">💡 Совет: Эти сервисы лучше понимают английский язык.</p>}
-                </div>
+                <div><label className="block text-sm font-bold text-gray-700 mb-2">Качество</label><div className="flex bg-gray-50 p-1 rounded-xl">{(['Standard', 'High'] as Quality[]).map(q => <button key={q} onClick={() => setQuality(q)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg ${quality === q ? 'bg-white shadow' : 'text-gray-400'}`}>{q === 'Standard' ? 'Быстро (Flash)' : 'HD (Pro)'}</button>)}</div></div>
+                <div><label className="block text-sm font-bold text-gray-700 mb-2">Детали</label><textarea rows={3} value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder="Например: надень шляпу..." className="w-full p-3 rounded-xl bg-gray-50 outline-none text-sm" />{showEnglishHint && <p className="text-[10px] text-orange-500 mt-1 font-bold">💡 Лучше писать на английском.</p>}</div>
               </div>
             </div>
-
             <div className="space-y-4 sticky top-20">
-               <div className={`bg-white rounded-2xl p-4 shadow-xl border border-gray-100 h-full min-h-[400px] flex flex-col ${state === AppState.SUCCESS ? 'border-primary/30 ring-4 ring-primary/5' : ''}`}>
-                <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-gray-700 text-sm">Результат</h3>{generatedImage && state === AppState.SUCCESS && !isEditing && <button onClick={() => { setIsEditing(true); setEditValues({ brightness: 100, contrast: 100, saturation: 100 }); }} className="text-xs font-bold text-secondary bg-secondary/10 px-3 py-1 rounded-lg hover:bg-secondary/20 flex items-center gap-1">✏️ Редактор</button>}</div>
-                <div className="flex-1 flex items-center justify-center bg-gray-50/50 rounded-xl relative overflow-hidden min-h-[350px]">
-                  {state === AppState.IDLE && !generatedImage && <div className="text-center text-gray-400 p-8"><p className="text-6xl mb-4 opacity-50">🖼️</p><p className="text-sm">Результат появится здесь</p></div>}
+               <div className={`bg-white rounded-2xl p-4 shadow-xl border border-gray-100 min-h-[400px] flex flex-col ${state === AppState.SUCCESS ? 'border-primary/30' : ''}`}>
+                <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-gray-700 text-sm">Результат</h3>{generatedImage && state === AppState.SUCCESS && !isEditing && <button onClick={() => { setIsEditing(true); setEditValues({ brightness: 100, contrast: 100, saturation: 100 }); }} className="text-xs font-bold text-secondary bg-secondary/10 px-2 py-1 rounded">✏️ Редактор</button>}</div>
+                <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-xl relative overflow-hidden min-h-[350px]">
+                  {state === AppState.IDLE && !generatedImage && <div className="text-center text-gray-400"><p className="text-6xl mb-2">🖼️</p><p className="text-sm">Здесь будет результат</p></div>}
                   {state === AppState.LOADING && <Spinner />}
-                  {state === AppState.ERROR && (
-                    <div className="text-center p-8 max-w-sm">
-                        <p className="text-5xl mb-4">😕</p>
-                        <p className="text-red-500 font-bold mb-2">Упс!</p>
-                        <p className="text-gray-600 text-sm whitespace-pre-line mb-4">{error}</p>
-                        <Button onClick={() => setIsSettingsOpen(true)} className="text-xs py-2 px-4" variant="outline">
-                           ⚙️ Изменить настройки
-                        </Button>
-                    </div>
-                  )}
-                  {generatedImage && state !== AppState.LOADING && <div className="relative w-full h-full flex items-center justify-center"><img src={generatedImage} alt="Caricature" onClick={() => setFullScreenImage(generatedImage)} className="max-w-full max-h-[600px] object-contain rounded-lg shadow-sm transition-all duration-500 animate-fade-in hover:scale-[1.01] cursor-zoom-in" style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} /></div>}
+                  {state === AppState.ERROR && <div className="text-center p-4"><p className="text-4xl mb-2">😕</p><p className="text-red-500 font-bold mb-1">Упс!</p><p className="text-gray-500 text-xs mb-3">{error}</p><Button onClick={() => setIsSettingsOpen(true)} className="text-xs py-1 px-3" variant="outline">Настройки</Button></div>}
+                  {generatedImage && state !== AppState.LOADING && <img src={generatedImage} onClick={() => setFullScreenImage(generatedImage)} className="max-w-full max-h-[600px] object-contain rounded cursor-zoom-in" style={isEditing ? { filter: `brightness(${editValues.brightness}%) contrast(${editValues.contrast}%) saturate(${editValues.saturation}%)` } : {}} />}
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
-                {isEditing && <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100 animate-fade-in"><div className="space-y-4"><div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1"><span>Яркость</span> <span>{editValues.brightness}%</span></label><input type="range" min="50" max="150" value={editValues.brightness} onChange={(e) => setEditValues(prev => ({...prev, brightness: Number(e.target.value)}))} className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none" /></div><div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1"><span>Контраст</span> <span>{editValues.contrast}%</span></label><input type="range" min="50" max="150" value={editValues.contrast} onChange={(e) => setEditValues(prev => ({...prev, contrast: Number(e.target.value)}))} className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none" /></div><div className="flex gap-2 pt-2"><Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 py-3 text-xs rounded-xl">Отмена</Button><Button onClick={handleSaveEdits} className="flex-1 py-3 text-xs rounded-xl">Сохранить</Button></div></div></div>}
-                {state === AppState.SUCCESS && generatedImage && !isEditing && (
-                  <div className="mt-4 animate-slide-up grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={() => setIsSaveModalOpen(true)} className="py-4 rounded-xl text-sm border-2">Сохранить как...</Button>
-                    <div className="flex flex-col gap-2">
-                      <Button variant="secondary" onClick={handleQuickDownload} className="py-2.5 rounded-xl shadow-lg shadow-secondary/20 text-sm">Скачать 📥</Button>
-                      <Button onClick={handleShare} className="py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 shadow-blue-500/30 text-white text-sm">Поделиться 🔗</Button>
-                    </div>
-                  </div>
-                )}
+                {isEditing && <div className="mt-4 p-3 bg-gray-50 rounded"><div className="space-y-2"><input type="range" min="50" max="150" value={editValues.brightness} onChange={e => setEditValues(prev => ({...prev, brightness: Number(e.target.value)}))} className="w-full accent-primary h-1" /><input type="range" min="50" max="150" value={editValues.contrast} onChange={e => setEditValues(prev => ({...prev, contrast: Number(e.target.value)}))} className="w-full accent-primary h-1" /><div className="flex gap-2 pt-2"><Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 py-1 text-xs">Отмена</Button><Button onClick={handleSaveEdits} className="flex-1 py-1 text-xs">Сохранить</Button></div></div></div>}
+                {state === AppState.SUCCESS && generatedImage && !isEditing && <div className="mt-4 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => setIsSaveModalOpen(true)} className="py-3 text-xs">Сохранить как...</Button><div className="flex flex-col gap-1"><Button variant="secondary" onClick={handleQuickDownload} className="py-1 text-xs">Скачать</Button><Button onClick={handleShare} className="py-1 bg-blue-500 text-white text-xs">Поделиться</Button></div></div>}
               </div>
             </div>
-          </div>
-        )}
-
-        {originalImage && !activeReferenceId && (
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-lg border-t border-gray-200 z-50 lg:hidden safe-bottom shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-                 <Button onClick={handleGenerateAndSave} isLoading={state === AppState.LOADING} className="w-full text-lg py-4 rounded-2xl shadow-xl shadow-primary/30" disabled={!!activeReferenceId}>{state === AppState.SUCCESS ? 'Создать еще ✨' : 'Сделать карикатуру! 🎨'}</Button>
-            </div>
-        )}
-
-        {originalImage && !activeReferenceId && <div className="hidden lg:block fixed bottom-8 right-8 z-40"><Button onClick={handleGenerateAndSave} isLoading={state === AppState.LOADING} className="text-lg py-4 px-8 rounded-full shadow-2xl shadow-primary/40 transform hover:scale-105 active:scale-95 transition-all">{state === AppState.SUCCESS ? 'Создать еще ✨' : 'Сделать карикатуру! 🎨'}</Button></div>}
-
-        {history.length > 0 && (
-          <div className="mt-8 border-t border-gray-200 pt-8 pb-20">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><span>🕰️</span> История</h2>
-            <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
-              {history.map((item) => (
-                <div key={item.id} onClick={() => setFullScreenImage(item.url)} className="flex-shrink-0 w-32 bg-white p-2 rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform cursor-pointer relative group">
-                  <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50"><img src={item.url} alt="History" className="w-full h-full object-cover" /></div>
-                  <div className="flex justify-between items-center px-1"><span className="text-[9px] font-bold text-gray-500 truncate max-w-[60px]">{item.style}</span><span className="text-[9px] text-gray-300">{new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div>
-                  
-                  {/* Small edit button directly in history card, as requested "Editor button in history" */}
-                  <button onClick={(e) => { e.stopPropagation(); loadFromHistory(item); }} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white text-xs" title="Редактировать">✏️</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>}
+        {originalImage && !activeReferenceId && <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur border-t z-50 lg:hidden"><Button onClick={handleGenerateAndSave} isLoading={state === AppState.LOADING} className="w-full py-3 shadow-xl" disabled={!!activeReferenceId}>{state === AppState.SUCCESS ? 'Создать еще ✨' : 'Сделать карикатуру! 🎨'}</Button></div>}
+        {originalImage && !activeReferenceId && <div className="hidden lg:block fixed bottom-8 right-8 z-40"><Button onClick={handleGenerateAndSave} isLoading={state === AppState.LOADING} className="py-4 px-8 rounded-full shadow-2xl hover:scale-105">{state === AppState.SUCCESS ? 'Создать еще ✨' : 'Сделать карикатуру! 🎨'}</Button></div>}
+        {history.length > 0 && <div className="mt-8 border-t pt-8 pb-20"><h2 className="text-xl font-bold mb-4">🕰️ История</h2><div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar">{history.map(item => <div key={item.id} onClick={() => setFullScreenImage(item.url)} className="flex-shrink-0 w-24 bg-white p-1 rounded border cursor-pointer relative group"><img src={item.url} className="w-full aspect-square object-cover rounded" /><button onClick={e => { e.stopPropagation(); loadFromHistory(item); }} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-xs opacity-0 group-hover:opacity-100">✏️</button></div>)}</div></div>}
       </main>
-
-      <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .animate-fade-in { animation: fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-      `}</style>
+      <style>{`.no-scrollbar::-webkit-scrollbar { display: none; } .safe-top { padding-top: env(safe-area-inset-top); }`}</style>
     </div>
   );
 };
