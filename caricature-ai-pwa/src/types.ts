@@ -57,7 +57,8 @@ export enum ArtStyle {
   POST_APOCALYPTIC = 'Постапокалипсис',
   BAUHAUS = 'Баухаус',
   SAMURAI = 'Самурай',
-  // --- NEW ADDITIONS (Completing the list) ---
+  
+  // --- NEW ADDITIONS ---
   CUTE_CREATURE = 'Милашка',
   FUTURE_ARCH = 'Футуризм (Арх)',
   GOTHIC_ARCH = 'Готика (Арх)',
@@ -97,13 +98,24 @@ export enum ArtStyle {
   PLAYING_CARD = 'Игральная карта'
 }
 
+export enum Tool {
+  NONE = 'NONE',
+  PENCIL = 'PENCIL',
+  RECTANGLE = 'RECTANGLE',
+  ERASER = 'ERASER',
+  STAMP = 'STAMP'
+}
+
+// Types
+export type Quality = 'Standard' | 'High';
+export type ImageSize = '1K' | '2K' | '4K';
+export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
+
+// Interfaces
 export interface GeneratedImage {
   imageUrl: string;
   prompt: string;
 }
-
-export type Quality = 'Standard' | 'High';
-export type ImageSize = '1K' | '2K' | '4K';
 
 export interface HistoryItem {
   id: string;
@@ -114,18 +126,10 @@ export interface HistoryItem {
 
 export interface ReferenceImage {
   id: string;
-  originalUrl: string; // Blob URL for display
-  base64: string;      // Original full base64
-  croppedBase64?: string; // If user selected a specific part
+  originalUrl: string;
+  base64: string;
+  croppedBase64?: string;
   mimeType: string;
-}
-
-export enum Tool {
-  NONE = 'NONE',
-  PENCIL = 'PENCIL',
-  RECTANGLE = 'RECTANGLE',
-  ERASER = 'ERASER',
-  STAMP = 'STAMP'
 }
 
 export interface Point {
@@ -135,14 +139,12 @@ export interface Point {
 
 export interface SelectionData {
   type: Tool;
-  points: Point[]; // Used for pencil
-  rect?: { x: number; y: number; w: number; h: number }; // Used for rectangle
+  points: Point[];
+  rect?: { x: number; y: number; w: number; h: number };
 }
-
-export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
 export interface AppSettings {
   provider: AIProvider;
   apiKey: string;
-  baseUrl?: string; // Optional custom endpoint
+  baseUrl?: string;
 }
