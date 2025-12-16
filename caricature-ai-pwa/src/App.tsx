@@ -74,6 +74,8 @@ const App: React.FC = () => {
   const currentDisplayImage = activeReferenceId 
     ? referenceImages.find(r => r.id === activeReferenceId)?.originalUrl || null 
     : originalImage;
+  
+  const showEnglishHint = appSettings && ['pollinations', 'stability', 'huggingface'].includes(appSettings.provider);
 
   // Load history on mount & Setup PWA & API Key
   useEffect(() => {
@@ -481,7 +483,7 @@ const App: React.FC = () => {
           setReferenceImages([]); 
           setActiveReferenceId(null); 
           setStampSource(null);
-          setCustomPrompt("Funny caricature of..."); // Pre-fill to guide user
+          setCustomPrompt("Смешная карикатура на..."); // Pre-fill to guide user in Russian
       }
   };
 
@@ -712,7 +714,7 @@ const App: React.FC = () => {
                        window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                     setFullScreenImage(null);
-                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50 bg-white text-dark hover:bg-gray-100 border-none">
+                }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50 !bg-white !text-gray-900 hover:!bg-gray-100 border-none">
                   ✏️ Редактор
                 </Button>
               </div>
@@ -750,7 +752,7 @@ const App: React.FC = () => {
             <p className="text-lg text-gray-500 max-w-xs mx-auto">Загрузите фото, и искусственный интеллект превратит его в веселую карикатуру.</p>
             <div className="pt-8 w-full max-w-sm flex flex-col gap-3">
               <Button onClick={() => fileInputRef.current?.click()} className="w-full text-lg py-4 shadow-xl shadow-primary/20 rounded-2xl">Загрузить фото 📸</Button>
-              <Button onClick={handleTextMode} variant="secondary" className="w-full text-md py-3 shadow-lg shadow-secondary/10 rounded-2xl bg-white text-secondary border-2 border-secondary/20 hover:bg-secondary hover:text-white">По описанию 📝</Button>
+              <Button onClick={handleTextMode} variant="secondary" className="w-full text-lg py-4 shadow-xl shadow-secondary/20 rounded-2xl">По описанию 📝</Button>
             </div>
           </div>
         )}
@@ -798,7 +800,11 @@ const App: React.FC = () => {
               <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 space-y-5">
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Стиль</label><StyleSelector selectedStyle={selectedStyle} onSelect={setSelectedStyle} disabled={state === AppState.LOADING} /></div>
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Качество</label><div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">{(['Standard', 'High'] as Quality[]).map((q) => (<button key={q} onClick={() => setQuality(q)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${quality === q ? 'bg-white text-dark shadow-sm border border-gray-100' : 'text-gray-400'}`}>{q === 'Standard' ? 'Быстро' : 'HD (Высокое)'}</button>))}</div></div>
-                <div><label htmlFor="custom-prompt" className="block text-sm font-bold text-gray-700 mb-2">Детали</label><textarea id="custom-prompt" rows={3} value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder={referenceImages.length > 0 ? "Например: надень шляпу на голову..." : "Например: сделай фон космосом..."} className="w-full p-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-secondary focus:ring-2 focus:ring-secondary/10 transition-all outline-none resize-none text-sm placeholder-gray-400" /></div>
+                <div>
+                   <label htmlFor="custom-prompt" className="block text-sm font-bold text-gray-700 mb-2">Детали</label>
+                   <textarea id="custom-prompt" rows={3} value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder={referenceImages.length > 0 ? "Например: надень шляпу на голову..." : "Например: сделай фон космосом..."} className="w-full p-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-secondary focus:ring-2 focus:ring-secondary/10 transition-all outline-none resize-none text-sm placeholder-gray-400" />
+                   {showEnglishHint && <p className="text-[10px] text-orange-500 mt-1 font-bold">💡 Совет: Эти сервисы лучше понимают английский язык.</p>}
+                </div>
               </div>
             </div>
 
@@ -841,9 +847,12 @@ const App: React.FC = () => {
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><span>🕰️</span> История</h2>
             <div className="flex overflow-x-auto gap-3 pb-4 no-scrollbar">
               {history.map((item) => (
-                <div key={item.id} onClick={() => setFullScreenImage(item.url)} className="flex-shrink-0 w-32 bg-white p-2 rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform cursor-pointer">
+                <div key={item.id} onClick={() => setFullScreenImage(item.url)} className="flex-shrink-0 w-32 bg-white p-2 rounded-xl shadow-sm border border-gray-100 active:scale-95 transition-transform cursor-pointer relative group">
                   <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50"><img src={item.url} alt="History" className="w-full h-full object-cover" /></div>
                   <div className="flex justify-between items-center px-1"><span className="text-[9px] font-bold text-gray-500 truncate max-w-[60px]">{item.style}</span><span className="text-[9px] text-gray-300">{new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div>
+                  
+                  {/* Small edit button directly in history card, as requested "Editor button in history" */}
+                  <button onClick={(e) => { e.stopPropagation(); loadFromHistory(item); }} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white text-xs" title="Редактировать">✏️</button>
                 </div>
               ))}
             </div>
