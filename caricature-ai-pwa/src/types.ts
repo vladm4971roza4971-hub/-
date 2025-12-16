@@ -1,4 +1,3 @@
-
 export enum AppState {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
