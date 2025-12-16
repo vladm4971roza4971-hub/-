@@ -106,10 +106,8 @@ export enum Tool {
   STAMP = 'STAMP'
 }
 
-// Types
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
-// Interfaces
 export interface GeneratedImage {
   imageUrl: string;
   prompt: string;
