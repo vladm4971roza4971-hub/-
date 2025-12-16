@@ -1,6 +1,5 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
-import { ArtStyle } from "../types";
-import type { ReferenceImage, AppSettings } from "../types";
+import { ArtStyle, type ReferenceImage, type AppSettings } from "../types";
 
 // Helper to convert File to Base64
 export const fileToBase64 = (file: File): Promise<string> => {
@@ -143,7 +142,7 @@ const generateWithGemini = async (
     mimeType: string
 ) => {
     const ai = new GoogleGenAI({ apiKey });
-    // ALWAYS use Flash Image, no choice
+    // Using Flash Image model
     const modelName = 'gemini-2.5-flash-image';
     
     let prompt = getBasePrompt(style);
@@ -220,16 +219,15 @@ const generateWithPollinations = async (style: ArtStyle, customPrompt: string) =
     return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result as string); reader.onerror = reject; reader.readAsDataURL(blob); });
 };
 
-// --- DUMMY HANDLERS FOR OTHER PROVIDERS TO KEEP CODE VALID BUT SIMPLE ---
+// Dummies for unused providers to simplify
 const generateWithStability = async (apiKey: string, mainImageBase64: string, style: ArtStyle, customPrompt: string, baseUrl: string = 'https://api.stability.ai') => {
-   // Implementation preserved from previous, but shortened for brevity in this specific fix
-   throw new Error("Stability implementation temporarily simplified for fix.");
+   throw new Error("Provider implementation simplified.");
 };
 const generateWithOpenAI = async (apiKey: string, style: ArtStyle, customPrompt: string, baseUrl: string = 'https://api.openai.com/v1') => {
-   throw new Error("OpenAI implementation temporarily simplified for fix.");
+   throw new Error("Provider implementation simplified.");
 };
 const generateWithHuggingFace = async (apiKey: string, mainImageBase64: string, style: ArtStyle, customPrompt: string, mimeType: string) => {
-   throw new Error("HuggingFace implementation temporarily simplified for fix.");
+   throw new Error("Provider implementation simplified.");
 };
 
 export const generateCaricature = async (
