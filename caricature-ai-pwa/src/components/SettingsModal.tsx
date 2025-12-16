@@ -13,7 +13,6 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSettingsChange, currentSettings }) => {
   const [provider, setProvider] = useState<AIProvider>('gemini');
   const [apiKey, setApiKey] = useState('');
-  const [geminiProApiKey, setGeminiProApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   
   const [status, setStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
@@ -24,12 +23,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       if (currentSettings) {
         setProvider(currentSettings.provider);
         setApiKey(currentSettings.apiKey);
-        setGeminiProApiKey(currentSettings.geminiProApiKey || '');
         setBaseUrl(currentSettings.baseUrl || '');
       } else {
         setProvider('gemini');
         setApiKey('');
-        setGeminiProApiKey('');
         setBaseUrl('');
       }
       setStatus('idle');
@@ -50,7 +47,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     const settingsToValidate: AppSettings = {
         provider,
         apiKey: apiKey.trim(),
-        geminiProApiKey: geminiProApiKey.trim() || undefined,
         baseUrl: baseUrl.trim() || undefined
     };
 
@@ -69,7 +65,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const handleClear = () => {
     setApiKey('');
-    setGeminiProApiKey('');
     setBaseUrl('');
     onSettingsChange(null);
     onClose();
@@ -131,17 +126,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
           {currentInfo.needsKey && (
             <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ {provider === 'gemini' ? '(Flash)' : ''}</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ</label>
                 <input type="password" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setStatus('idle'); setStatusMsg(''); }} placeholder={`Ключ для ${currentInfo.name}`} className={`w-full p-3 rounded-xl bg-gray-50 border outline-none transition-all ${status === 'invalid' ? 'border-red-400 bg-red-50' : status === 'valid' ? 'border-green-400 bg-green-50' : 'border-gray-200 focus:border-secondary focus:bg-white'}`} />
-
-                {provider === 'gemini' && (
-                  <div className="mt-3">
-                     <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ (Pro / High Quality) <span className="text-gray-400 font-normal">- Опционально</span></label>
-                     <input type="password" value={geminiProApiKey} onChange={(e) => setGeminiProApiKey(e.target.value)} placeholder="Отдельный ключ для Pro модели" className="w-full p-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-secondary focus:bg-white outline-none transition-all" />
-                     <p className="text-[10px] text-gray-400 mt-1">Используется, если выбрано "HD" качество. Если пусто, используется основной ключ.</p>
-                  </div>
-                )}
-
                 <div className="mt-2 text-right">
                     {provider === 'gemini' && <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить ключ Google</a>}
                     {provider === 'openai' && <a href="https://platform.openai.com/api-keys" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить ключ OpenAI</a>}
