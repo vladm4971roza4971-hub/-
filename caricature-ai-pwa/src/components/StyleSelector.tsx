@@ -183,7 +183,7 @@ const STYLE_VISUALS: Record<ArtStyle, { emoji: string; bgClass: string; darkText
     darkText: false,
     description: 'Старая черно-белая хроника'
   },
-  // New Styles Visuals
+  // Previous Batch
   [ArtStyle.RENAISSANCE]: {
     emoji: '🎭',
     bgClass: 'bg-gradient-to-br from-yellow-700 via-amber-800 to-orange-900',
@@ -315,7 +315,45 @@ const STYLE_VISUALS: Record<ArtStyle, { emoji: string; bgClass: string; darkText
     bgClass: 'bg-gradient-to-br from-gray-200 via-red-100 to-gray-200',
     darkText: true,
     description: 'Японская тушь и воины'
-  }
+  },
+  // --- NEW VISUALS ---
+  [ArtStyle.CUTE_CREATURE]: { emoji: '🥺', bgClass: 'bg-gradient-to-br from-pink-200 via-rose-100 to-white', darkText: true, description: 'Милое пушистое существо' },
+  [ArtStyle.FUTURE_ARCH]: { emoji: '🏙️', bgClass: 'bg-gradient-to-br from-white via-blue-50 to-slate-200', darkText: true, description: 'Архитектура будущего' },
+  [ArtStyle.GOTHIC_ARCH]: { emoji: '⛪', bgClass: 'bg-gradient-to-br from-stone-700 via-stone-800 to-black', darkText: false, description: 'Готический собор' },
+  [ArtStyle.BRUTALISM]: { emoji: '🏢', bgClass: 'bg-gray-400', darkText: true, description: 'Бетон и геометрия' },
+  [ArtStyle.AI_LOGO]: { emoji: '💠', bgClass: 'bg-white border border-gray-200', darkText: true, description: 'Векторный логотип' },
+  [ArtStyle.FANTASY_MAP]: { emoji: '🗺️', bgClass: 'bg-amber-100 bg-[url("https://www.transparenttextures.com/patterns/parchment.png")]', darkText: true, description: 'Старинная карта' },
+  [ArtStyle.OCEAN_LIFE]: { emoji: '🐠', bgClass: 'bg-gradient-to-b from-cyan-400 to-blue-700', darkText: false, description: 'Кораллы и рыбы' },
+  [ArtStyle.SPACE_WORLD]: { emoji: '🌌', bgClass: 'bg-black bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900 to-black', darkText: false, description: 'Глубокий космос' },
+  [ArtStyle.URBAN_FASHION]: { emoji: '👟', bgClass: 'bg-gradient-to-br from-orange-400 via-pink-500 to-purple-500', darkText: false, description: 'Стильная уличная мода' },
+  [ArtStyle.MINIMALISM]: { emoji: '⚪', bgClass: 'bg-gray-50 border border-gray-100', darkText: true, description: 'Чистота и простота' },
+  [ArtStyle.HORROR]: { emoji: '👻', bgClass: 'bg-gradient-to-br from-black via-red-900 to-black', darkText: false, description: 'Жуткий призрак' },
+  [ArtStyle.ROMANTICISM]: { emoji: '🌄', bgClass: 'bg-gradient-to-br from-orange-200 via-amber-300 to-sky-300', darkText: true, description: 'Эмоциональный пейзаж' },
+  [ArtStyle.ABSTRACT_EXPRESSIONISM]: { emoji: '🎨', bgClass: 'bg-[url("https://www.transparenttextures.com/patterns/splatter.png")] bg-white', darkText: true, description: 'Хаос и брызги' },
+  [ArtStyle.GLADIATOR]: { emoji: '🛡️', bgClass: 'bg-gradient-to-br from-yellow-700 via-orange-800 to-stone-800', darkText: false, description: 'Арена и доспехи' },
+  [ArtStyle.ALIEN_FLORA]: { emoji: '👽', bgClass: 'bg-gradient-to-br from-lime-400 via-teal-500 to-indigo-600', darkText: false, description: 'Инопланетные растения' },
+  [ArtStyle.FAIRY_TALE]: { emoji: '🧚', bgClass: 'bg-gradient-to-br from-purple-200 via-pink-200 to-yellow-100', darkText: true, description: 'Волшебная сказка' },
+  [ArtStyle.MYTHIC_CREATURE]: { emoji: '🦄', bgClass: 'bg-gradient-to-br from-indigo-300 via-purple-300 to-pink-300', darkText: true, description: 'Легендарный зверь' },
+  [ArtStyle.CARNIVAL]: { emoji: '🎭', bgClass: 'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500', darkText: false, description: 'Праздник и маски' },
+  [ArtStyle.ACTION_FIGURE]: { emoji: '🎎', bgClass: 'bg-gradient-to-br from-blue-500 via-cyan-400 to-white', darkText: true, description: 'Игрушка в упаковке' },
+  [ArtStyle.BLUEPRINT]: { emoji: '📐', bgClass: 'bg-blue-800 grid grid-cols-4 gap-1', darkText: false, description: 'Синий чертеж' },
+  [ArtStyle.ZOMBIE]: { emoji: '🧟', bgClass: 'bg-gradient-to-br from-green-800 via-stone-700 to-black', darkText: false, description: 'Апокалипсис' },
+  [ArtStyle.BIOLUMINESCENCE]: { emoji: '🎐', bgClass: 'bg-black border border-cyan-500 shadow-[0_0_10px_#00ffff]', darkText: false, description: 'Свечение в темноте' },
+  [ArtStyle.ICE_WORLD]: { emoji: '❄️', bgClass: 'bg-gradient-to-br from-cyan-100 via-cyan-200 to-blue-300', darkText: true, description: 'Лед и снег' },
+  [ArtStyle.ATLANTIS]: { emoji: '🔱', bgClass: 'bg-gradient-to-br from-teal-600 via-cyan-700 to-blue-800', darkText: false, description: 'Затонувший город' },
+  [ArtStyle.KAWAII_EMOJI]: { emoji: '😊', bgClass: 'bg-yellow-300', darkText: true, description: 'Супер милый стиль' },
+  [ArtStyle.WITCHCRAFT]: { emoji: '🧹', bgClass: 'bg-gradient-to-br from-purple-800 via-indigo-900 to-black', darkText: false, description: 'Магия и зелья' },
+  [ArtStyle.MECHANICAL_ANATOMY]: { emoji: '🦾', bgClass: 'bg-amber-50 border border-amber-200', darkText: true, description: 'Механизм внутри' },
+  [ArtStyle.CLOCKWORK]: { emoji: '🕰️', bgClass: 'bg-gradient-to-br from-yellow-600 via-amber-700 to-yellow-800', darkText: false, description: 'Шестеренки и часы' },
+  [ArtStyle.MARIONETTE]: { emoji: '🧵', bgClass: 'bg-gradient-to-br from-amber-200 via-orange-200 to-red-100', darkText: true, description: 'Деревянная кукла' },
+  [ArtStyle.TROPICAL]: { emoji: '🌴', bgClass: 'bg-gradient-to-br from-green-400 via-yellow-300 to-orange-400', darkText: true, description: 'Тропический рай' },
+  [ArtStyle.ELVEN]: { emoji: '🧝', bgClass: 'bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100', darkText: true, description: 'Эльфийская магия' },
+  [ArtStyle.ZENTANGLE]: { emoji: '🖊️', bgClass: 'bg-white bg-[radial-gradient(#000_0.5px,transparent_0.5px)] [background-size:4px_4px]', darkText: true, description: 'Узоры ручкой' },
+  [ArtStyle.MAYAN]: { emoji: '🗿', bgClass: 'bg-gradient-to-br from-stone-400 via-stone-500 to-stone-600', darkText: false, description: 'Древние майя' },
+  [ArtStyle.DECOUPAGE]: { emoji: '✂️', bgClass: 'bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100', darkText: true, description: 'Бумажный декор' },
+  [ArtStyle.TERRARIUM]: { emoji: '🌿', bgClass: 'bg-gradient-to-br from-green-50 via-green-100 to-emerald-200 border border-green-300', darkText: true, description: 'Мир в банке' },
+  [ArtStyle.COLLAGE]: { emoji: '🎞️', bgClass: 'bg-yellow-50 border-2 border-dashed border-gray-400', darkText: true, description: 'Вырезки из газет' },
+  [ArtStyle.PLAYING_CARD]: { emoji: '🃏', bgClass: 'bg-white border-4 border-double border-red-800', darkText: true, description: 'Карточный король' }
 };
 
 export const StyleSelector: React.FC<StyleSelectorProps> = ({ selectedStyle, onSelect, disabled }) => {
