@@ -687,8 +687,32 @@ const App: React.FC = () => {
   };
 
   const loadFromHistory = (item: HistoryItem) => {
-    setGeneratedImage(item.url); setState(AppState.SUCCESS); setOriginalImage(null); 
-    setReferenceImages([]); setActiveReferenceId(null); setSelection(null);
+    // 1. Set the history image as the SOURCE (Original) image so the Editor UI appears
+    setOriginalImage(item.url);
+    
+    // 2. We need to populate rawBase64 for the generator to work if user clicks "Generate" again
+    // History URLs are usually data URLs (data:image/png;base64,...)
+    if (item.url.includes(',')) {
+        setRawBase64(item.url.split(',')[1]);
+    } else {
+        setRawBase64(item.url);
+    }
+    
+    setMimeType('image/png'); // History items are usually PNG
+
+    // 3. Reset state to IDLE so we see the canvas, not the "Success" result view immediately
+    // or we can set it to IDLE to allow further editing. 
+    // If we want to just SHOW the result, we would keep SUCCESS. 
+    // But user asked to "Edit", so we treat it as a fresh start with this image.
+    setGeneratedImage(null); 
+    setState(AppState.IDLE);
+    
+    setReferenceImages([]); 
+    setActiveReferenceId(null); 
+    setSelection(null);
+    setStampSource(null);
+    setCustomPrompt('');
+    
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -729,14 +753,19 @@ const App: React.FC = () => {
                     const item = history.find(i => i.url === fullScreenImage);
                     if (item) {
                        loadFromHistory(item);
+                       setFullScreenImage(null);
                     } else {
                        // Fallback if trying to edit something not in history list yet
-                       setGeneratedImage(fullScreenImage);
-                       setState(AppState.SUCCESS);
-                       setOriginalImage(null);
+                       // Treat fullscreen image as source
+                       setOriginalImage(fullScreenImage);
+                       if (fullScreenImage && fullScreenImage.includes(',')) {
+                           setRawBase64(fullScreenImage.split(',')[1]);
+                       }
+                       setGeneratedImage(null);
+                       setState(AppState.IDLE);
+                       setFullScreenImage(null);
                        window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
-                    setFullScreenImage(null);
                 }} className="flex-1 py-3 text-sm shadow-xl shadow-black/50 !bg-white !text-gray-900 hover:!bg-gray-100 border-none">
                   ✏️ Редактор
                 </Button>
