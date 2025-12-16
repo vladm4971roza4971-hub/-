@@ -16,43 +16,6 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-// Helper: Resize image
-const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<string> => {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.src = `data:${mimeType};base64,${base64}`;
-        img.onload = () => {
-            let { width, height } = img;
-            if (width <= maxDim && height <= maxDim) {
-                resolve(base64);
-                return;
-            }
-            if (width > height) {
-                height *= maxDim / width;
-                width = maxDim;
-            } else {
-                width *= maxDim / height;
-                height = maxDim;
-            }
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(img, 0, 0, width, height);
-                const newData = canvas.toDataURL('image/jpeg', 0.6);
-                resolve(newData.split(',')[1]);
-            } else {
-                resolve(base64);
-            }
-        };
-        img.onerror = () => {
-            resolve(base64);
-        };
-    });
-};
-
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const validateApiKey = async (settings: AppSettings): Promise<boolean> => {
