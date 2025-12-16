@@ -20,7 +20,7 @@ export const fileToBase64 = (file: File): Promise<string> => {
 const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = "anonymous";
+        // No crossOrigin needed for Data URLs created from local strings
         img.src = `data:${mimeType};base64,${base64}`;
         img.onload = () => {
             let { width, height } = img;
@@ -45,7 +45,7 @@ const resizeImage = (base64: string, mimeType: string, maxDim: number): Promise<
             if (ctx) {
                 ctx.drawImage(img, 0, 0, width, height);
                 // Convert to JPEG with compression to save bandwidth
-                const newData = canvas.toDataURL('image/jpeg', 0.85);
+                const newData = canvas.toDataURL('image/jpeg', 0.8);
                 resolve(newData.split(',')[1]);
             } else {
                 resolve(base64);
@@ -307,9 +307,9 @@ const generateWithHuggingFace = async (
 ) => {
     const stylePrompt = getStylePrompt(style);
 
-    // CRITICAL: Resize image to max 600px to prevent "Failed to fetch" (Payload too large)
-    // The free inference API struggles with full-res phone photos.
-    const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 600);
+    // CRITICAL: Resize image to max 512px to prevent "Failed to fetch" (Payload too large)
+    // The free inference API struggles with anything larger than standard SD res (512x512)
+    const resizedBase64 = await resizeImage(mainImageBase64, mimeType, 512);
 
     // INSTRUCT PIX2PIX (Image Editing)
     const model = "timbrooks/instruct-pix2pix";
@@ -326,29 +326,37 @@ const generateWithHuggingFace = async (
         }
     };
 
-    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "x-use-cache": "false" 
-        },
-        body: JSON.stringify(payload),
-    });
+    try {
+        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "x-use-cache": "false" 
+            },
+            body: JSON.stringify(payload),
+        });
 
-    if (!response.ok) {
-        const err = await response.text();
-        if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
-        throw new Error(`HF Error: ${response.statusText} - ${err.slice(0, 100)}`);
+        if (!response.ok) {
+            const err = await response.text();
+            if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
+            throw new Error(`HF Error: ${response.statusText} - ${err.slice(0, 100)}`);
+        }
+
+        const blob = await response.blob();
+        return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error: any) {
+        // Handle network errors (Failed to fetch) gracefully
+        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+             throw new Error("Ошибка соединения с Hugging Face. Изображение слишком большое или сервер перегружен. Попробуйте обрезать фото или выбрать другое.");
+        }
+        throw error;
     }
-
-    const blob = await response.blob();
-    return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
 };
 
 // --- POLLINATIONS.AI HANDLER (Free) ---
