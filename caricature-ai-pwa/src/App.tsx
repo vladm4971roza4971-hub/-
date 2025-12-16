@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AppState, ArtStyle, Quality, HistoryItem, Tool, SelectionData, Point, ReferenceImage, AppSettings } from './types';
+import { AppState, ArtStyle, Tool } from './types';
+import type { Quality, HistoryItem, SelectionData, Point, ReferenceImage, AppSettings, ImageSize } from './types';
 import { Button } from './components/Button';
 import { Spinner } from './components/Spinner';
 import { StyleSelector } from './components/StyleSelector';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   // Settings
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ArtStyle.CARTOON);
   const [quality, setQuality] = useState<Quality>('Standard');
+  const [imageSize, setImageSize] = useState<ImageSize>('1K');
   const [customPrompt, setCustomPrompt] = useState<string>('');
   
   // Selection & Tools State
@@ -603,7 +605,8 @@ const App: React.FC = () => {
           referenceImages, 
           quality, 
           mimeType,
-          appSettings // Pass full settings object
+          appSettings, // Pass full settings object
+          imageSize // Pass selected image size (1K, 2K, 4K)
       );
       
       let finalResultUrl = resultUrl;
@@ -652,6 +655,28 @@ const App: React.FC = () => {
     if (!generatedImage) return;
     const link = document.createElement('a'); link.href = generatedImage; link.download = `caricature-${Date.now()}.png`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  const handleShare = async () => {
+    if (!generatedImage) return;
+    try {
+        const response = await fetch(generatedImage);
+        const blob = await response.blob();
+        const file = new File([blob], 'caricature.png', { type: 'image/png' });
+        
+        if (navigator.share) {
+            await navigator.share({
+                title: 'Моя карикатура AI',
+                text: 'Смотри, какую классную карикатуру я сделал с помощью ИИ!',
+                files: [file],
+            });
+        } else {
+            alert('Ваш браузер не поддерживает функцию "Поделиться". Скачайте изображение и отправьте его вручную.');
+        }
+    } catch (error) {
+        console.error('Sharing failed', error);
+        alert('Не удалось поделиться изображением.');
+    }
   };
 
   const handleSaveAs = async (filename: string, format: 'png' | 'jpeg') => {
@@ -864,6 +889,14 @@ const App: React.FC = () => {
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Стиль</label><StyleSelector selectedStyle={selectedStyle} onSelect={setSelectedStyle} disabled={state === AppState.LOADING} /></div>
                 <div><label className="block text-sm font-bold text-gray-700 mb-2">Качество</label><div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">{(['Standard', 'High'] as Quality[]).map((q) => (<button key={q} onClick={() => setQuality(q)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${quality === q ? 'bg-white text-dark shadow-sm border border-gray-100' : 'text-gray-400'}`}>{q === 'Standard' ? 'Быстро' : 'HD (Высокое)'}</button>))}</div></div>
                 <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Размер (Gemini)</label>
+                  <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+                    {(['1K', '2K', '4K'] as ImageSize[]).map((s) => (
+                      <button key={s} onClick={() => setImageSize(s)} disabled={state === AppState.LOADING} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${imageSize === s ? 'bg-white text-dark shadow-sm border border-gray-100' : 'text-gray-400'}`}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
                    <label htmlFor="custom-prompt" className="block text-sm font-bold text-gray-700 mb-2">Детали</label>
                    <textarea id="custom-prompt" rows={3} value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} disabled={state === AppState.LOADING} placeholder={referenceImages.length > 0 ? "Например: надень шляпу на голову..." : "Например: сделай фон космосом..."} className="w-full p-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-secondary focus:ring-2 focus:ring-secondary/10 transition-all outline-none resize-none text-sm placeholder-gray-400" />
                    {showEnglishHint && <p className="text-[10px] text-orange-500 mt-1 font-bold">💡 Совет: Эти сервисы лучше понимают английский язык.</p>}
@@ -891,7 +924,15 @@ const App: React.FC = () => {
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
                 {isEditing && <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100 animate-fade-in"><div className="space-y-4"><div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1"><span>Яркость</span> <span>{editValues.brightness}%</span></label><input type="range" min="50" max="150" value={editValues.brightness} onChange={(e) => setEditValues(prev => ({...prev, brightness: Number(e.target.value)}))} className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none" /></div><div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1"><span>Контраст</span> <span>{editValues.contrast}%</span></label><input type="range" min="50" max="150" value={editValues.contrast} onChange={(e) => setEditValues(prev => ({...prev, contrast: Number(e.target.value)}))} className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none" /></div><div className="flex gap-2 pt-2"><Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 py-3 text-xs rounded-xl">Отмена</Button><Button onClick={handleSaveEdits} className="flex-1 py-3 text-xs rounded-xl">Сохранить</Button></div></div></div>}
-                {state === AppState.SUCCESS && generatedImage && !isEditing && <div className="mt-4 animate-slide-up grid grid-cols-2 gap-3"><Button variant="outline" onClick={() => setIsSaveModalOpen(true)} className="py-4 rounded-xl text-sm border-2">Сохранить как...</Button><Button variant="secondary" onClick={handleQuickDownload} className="py-4 rounded-xl shadow-lg shadow-secondary/20 text-sm">Скачать 📥</Button></div>}
+                {state === AppState.SUCCESS && generatedImage && !isEditing && (
+                  <div className="mt-4 animate-slide-up grid grid-cols-2 gap-3">
+                    <Button variant="outline" onClick={() => setIsSaveModalOpen(true)} className="py-4 rounded-xl text-sm border-2">Сохранить как...</Button>
+                    <div className="flex flex-col gap-2">
+                      <Button variant="secondary" onClick={handleQuickDownload} className="py-2.5 rounded-xl shadow-lg shadow-secondary/20 text-sm">Скачать 📥</Button>
+                      <Button onClick={handleShare} className="py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 shadow-blue-500/30 text-white text-sm">Поделиться 🔗</Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
