@@ -203,7 +203,7 @@ const generateWithGemini = async (
             });
             const part = response.candidates?.[0]?.content?.parts?.[0];
             if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
-            throw new Error("No image in Gemini response");
+            throw new Error("Gemini не вернул изображение. Возможно, запрос был заблокирован фильтрами безопасности. Попробуйте изменить описание.");
         } catch (err: any) {
             // Enhanced 429 Quota Error Handling
             const msg = err.message || JSON.stringify(err);
@@ -232,7 +232,8 @@ const generateWithStability = async (
     baseUrl: string = 'https://api.stability.ai'
 ) => {
     const stylePrompt = getStylePrompt(style);
-    const finalPrompt = `(caricature:1.3), ${stylePrompt}, ${customPrompt}`;
+    // PRIORITIZE USER PROMPT: Putting customPrompt first helps model adherence
+    const finalPrompt = `${customPrompt ? customPrompt + ', ' : ''}(caricature:1.3), ${stylePrompt}`;
 
     const formData = new FormData();
     formData.append('init_image', new Blob([Buffer.from(mainImageBase64, 'base64')], { type: 'image/png' }));
@@ -257,7 +258,7 @@ const generateWithStability = async (
 
     if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Stability API Error: ${response.status} - ${errText}`);
+        throw new Error(`Ошибка Stability API: ${response.status} - ${errText}`);
     }
 
     const result = await response.json();
@@ -292,7 +293,7 @@ const generateWithOpenAI = async (
 
     if (!response.ok) {
         const err = await response.json();
-        throw new Error(`OpenAI Error: ${err.error?.message || response.statusText}`);
+        throw new Error(`Ошибка OpenAI: ${err.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
@@ -315,7 +316,8 @@ const generateWithHuggingFace = async (
 
     // INSTRUCT PIX2PIX (Image Editing)
     const model = "timbrooks/instruct-pix2pix";
-    const prompt = `turn him into a funny caricature, ${stylePrompt} style. ${customPrompt}`;
+    // Prioritize custom prompt instruction
+    const prompt = `${customPrompt ? customPrompt + '. ' : ''}turn him into a funny caricature, ${stylePrompt} style.`;
     
     // Construct JSON payload for HF Inference API
     const payload = {
@@ -344,7 +346,7 @@ const generateWithHuggingFace = async (
             if (err.includes('loading')) throw new Error("Модель загружается (холодный старт). Пожалуйста, подождите 20 секунд и нажмите кнопку снова.");
             // If still too large
             if (response.status === 413) throw new Error("Файл слишком большой для Hugging Face. Попробуйте обрезать его.");
-            throw new Error(`HF Error: ${response.status} - ${err.slice(0, 100)}`);
+            throw new Error(`Ошибка Hugging Face: ${response.status} - ${err.slice(0, 100)}`);
         }
 
         const blob = await response.blob();
@@ -370,13 +372,16 @@ const generateWithPollinations = async (
 ) => {
     // Pollinations is Text-to-Image in this implementation
     const stylePrompt = getStylePrompt(style);
-    const prompt = encodeURIComponent(`funny caricature, ${stylePrompt}, ${customPrompt}`);
+    
+    // PRIORITIZE USER PROMPT: Put customPrompt at the very beginning. 
+    // This helps the model see the subject ("pike fish", etc) before "funny caricature".
+    const prompt = encodeURIComponent(`${customPrompt ? customPrompt + ', ' : ''}funny caricature, ${stylePrompt}`);
     
     // Pollinations generates image via URL.
     const url = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000)}&nologo=true`;
     
     const response = await fetch(url);
-    if (!response.ok) throw new Error("Pollinations Service Error");
+    if (!response.ok) throw new Error("Ошибка сервиса Pollinations. Попробуйте позже.");
     
     const blob = await response.blob();
     return new Promise<string>((resolve, reject) => {
