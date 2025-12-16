@@ -104,6 +104,7 @@ export interface GeneratedImage {
 }
 
 export type Quality = 'Standard' | 'High';
+export type ImageSize = '1K' | '2K' | '4K';
 
 export interface HistoryItem {
   id: string;
@@ -138,8 +139,6 @@ export interface SelectionData {
   points: Point[]; // Used for pencil
   rect?: { x: number; y: number; w: number; h: number }; // Used for rectangle
 }
-
-// --- New Settings Types ---
 
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
