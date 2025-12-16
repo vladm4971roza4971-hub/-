@@ -74,11 +74,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const getProviderInfo = (p: AIProvider) => {
       switch(p) {
-          case 'gemini': return { icon: '✨', name: 'Google Gemini', desc: 'Лучшее качество. Видит фото.', hasFree: true, needsKey: true };
-          case 'openai': return { icon: '🧠', name: 'OpenAI DALL-E', desc: 'Мощный, но платный. Игнорирует фото.', hasFree: false, needsKey: true };
-          case 'stability': return { icon: '🎨', name: 'Stability AI', desc: 'Отлично обрабатывает фото (Img2Img).', hasFree: false, needsKey: true };
-          case 'huggingface': return { icon: '🤗', name: 'Hugging Face', desc: 'Бесплатный токен. Хорошее качество.', hasFree: true, needsKey: true };
-          case 'pollinations': return { icon: '🌸', name: 'Pollinations', desc: 'Полностью бесплатно. Без ключа.', hasFree: true, needsKey: false };
+          case 'gemini': return { icon: '✨', name: 'Google Gemini', desc: 'Лучшее качество. Видит фото. Лимиты на бесплатном тарифе.', hasFree: true, needsKey: true };
+          case 'openai': return { icon: '🧠', name: 'OpenAI DALL-E', desc: 'Мощный, но платный. Игнорирует фото (только текст).', hasFree: false, needsKey: true };
+          case 'stability': return { icon: '🎨', name: 'Stability AI', desc: 'Отлично обрабатывает фото (Img2Img). Платный.', hasFree: false, needsKey: true };
+          case 'huggingface': return { icon: '🤗', name: 'Hugging Face', desc: 'Бесплатный токен. Видит фото (InstructPix2Pix).', hasFree: true, needsKey: true };
+          case 'pollinations': return { icon: '🌸', name: 'Pollinations', desc: 'Бесплатно. Игнорирует фото (рисует с нуля по стилю).', hasFree: true, needsKey: false };
       }
   };
 
@@ -123,6 +123,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                   </p>
                   {!currentInfo.needsKey && (
                       <p className="text-xs text-green-600 font-bold mt-1">✅ Ключ не требуется!</p>
+                  )}
+                  {provider === 'pollinations' && (
+                      <p className="text-xs text-orange-500 font-bold mt-1">⚠️ Работает только по тексту (фото игнорируется)</p>
+                  )}
+                  {provider === 'huggingface' && (
+                      <p className="text-xs text-blue-500 font-bold mt-1">ℹ️ Использует InstructPix2Pix для фото</p>
                   )}
               </div>
           </div>
