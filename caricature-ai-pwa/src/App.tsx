@@ -1096,10 +1096,10 @@ const App: React.FC = () => {
                   )}
                   {state === AppState.LOADING && <Spinner />}
                   {state === AppState.ERROR && (
-                     <div className="text-center p-8 max-w-xs">
+                     <div className="text-center p-8 max-w-sm">
                        <p className="text-5xl mb-4">😕</p>
                        <p className="text-red-500 font-bold mb-2">Упс!</p>
-                       <p className="text-gray-600 text-sm">{error}</p>
+                       <p className="text-gray-600 text-sm whitespace-pre-line">{error}</p>
                      </div>
                   )}
                   {generatedImage && state !== AppState.LOADING && (
