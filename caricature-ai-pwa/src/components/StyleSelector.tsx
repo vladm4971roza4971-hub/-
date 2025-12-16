@@ -182,6 +182,139 @@ const STYLE_VISUALS: Record<ArtStyle, { emoji: string; bgClass: string; darkText
     bgClass: 'bg-gradient-to-br from-stone-400 via-stone-500 to-stone-700',
     darkText: false,
     description: 'Старая черно-белая хроника'
+  },
+  // New Styles Visuals
+  [ArtStyle.RENAISSANCE]: {
+    emoji: '🎭',
+    bgClass: 'bg-gradient-to-br from-yellow-700 via-amber-800 to-orange-900',
+    darkText: false,
+    description: 'Шедевр эпохи Возрождения'
+  },
+  [ArtStyle.ABSTRACT]: {
+    emoji: '🌀',
+    bgClass: 'bg-gradient-to-br from-red-400 via-yellow-400 to-blue-400',
+    darkText: true,
+    description: 'Абстрактные формы и цвета'
+  },
+  [ArtStyle.HOLOGRAM]: {
+    emoji: '💿',
+    bgClass: 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500',
+    darkText: false,
+    description: 'Футуристическая голограмма'
+  },
+  [ArtStyle.FANTASY]: {
+    emoji: '🐉',
+    bgClass: 'bg-gradient-to-br from-emerald-500 via-teal-600 to-green-700',
+    darkText: false,
+    description: 'Магический фэнтези мир'
+  },
+  [ArtStyle.COMICS]: {
+    emoji: '🦸',
+    bgClass: 'bg-gradient-to-br from-blue-600 via-red-600 to-yellow-500',
+    darkText: false,
+    description: 'Современный супергеройский комикс'
+  },
+  [ArtStyle.MANGA]: {
+    emoji: '🗯️',
+    bgClass: 'bg-white border-2 border-black bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:8px_8px]',
+    darkText: true,
+    description: 'Японская черно-белая манга'
+  },
+  [ArtStyle.GROTESQUE]: {
+    emoji: '👺',
+    bgClass: 'bg-gradient-to-br from-stone-500 via-red-900 to-black',
+    darkText: false,
+    description: 'Странные и пугающие пропорции'
+  },
+  [ArtStyle.TRIBAL]: {
+    emoji: '🗿',
+    bgClass: 'bg-gradient-to-br from-orange-300 via-stone-400 to-stone-600',
+    darkText: true,
+    description: 'Этнические узоры и мотивы'
+  },
+  [ArtStyle.MYSTICISM]: {
+    emoji: '🔮',
+    bgClass: 'bg-gradient-to-br from-violet-600 via-fuchsia-700 to-purple-900',
+    darkText: false,
+    description: 'Таро, руны и магия'
+  },
+  [ArtStyle.CHILDRENS_BOOK]: {
+    emoji: '🧸',
+    bgClass: 'bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100',
+    darkText: true,
+    description: 'Иллюстрация из доброй сказки'
+  },
+  [ArtStyle.ART_DECO]: {
+    emoji: '🍸',
+    bgClass: 'bg-gradient-to-br from-yellow-600 via-yellow-500 to-amber-200 border border-yellow-800',
+    darkText: true,
+    description: 'Роскошь 20-х годов'
+  },
+  [ArtStyle.ART_NOUVEAU]: {
+    emoji: '🌺',
+    bgClass: 'bg-gradient-to-br from-green-200 via-yellow-200 to-orange-200',
+    darkText: true,
+    description: 'Изящные линии и цветы'
+  },
+  [ArtStyle.BAROQUE]: {
+    emoji: '🎻',
+    bgClass: 'bg-gradient-to-br from-red-900 via-rose-900 to-slate-900',
+    darkText: false,
+    description: 'Драматичный и пышный стиль'
+  },
+  [ArtStyle.CUBISM]: {
+    emoji: '🧊',
+    bgClass: 'bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-600',
+    darkText: true,
+    description: 'Геометрические фрагменты'
+  },
+  [ArtStyle.MECHA]: {
+    emoji: '🦾',
+    bgClass: 'bg-gradient-to-br from-gray-300 via-gray-500 to-slate-600',
+    darkText: true,
+    description: 'Боевые роботы и броня'
+  },
+  [ArtStyle.ANCIENT_EGYPT]: {
+    emoji: '🏺',
+    bgClass: 'bg-gradient-to-br from-yellow-400 via-amber-400 to-orange-400',
+    darkText: true,
+    description: 'Фрески Древнего Египта'
+  },
+  [ArtStyle.WILD_WEST]: {
+    emoji: '🤠',
+    bgClass: 'bg-[url("https://www.transparenttextures.com/patterns/aged-paper.png")] bg-amber-200',
+    darkText: true,
+    description: 'Постер розыска с Дикого Запада'
+  },
+  [ArtStyle.PSYCHEDELIC]: {
+    emoji: '🍄',
+    bgClass: 'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500',
+    darkText: false,
+    description: 'Кислотные цвета 60-х'
+  },
+  [ArtStyle.CAVE_PAINTING]: {
+    emoji: '🐂',
+    bgClass: 'bg-stone-500 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-400 via-stone-600 to-stone-800',
+    darkText: false,
+    description: 'Наскальная живопись'
+  },
+  [ArtStyle.POST_APOCALYPTIC]: {
+    emoji: '☢️',
+    bgClass: 'bg-gradient-to-br from-stone-600 via-gray-600 to-zinc-700',
+    darkText: false,
+    description: 'Ржавчина и пустошь'
+  },
+  [ArtStyle.BAUHAUS]: {
+    emoji: '📐',
+    bgClass: 'bg-white border-4 border-l-red-500 border-t-yellow-500 border-r-blue-500 border-b-black',
+    darkText: true,
+    description: 'Функциональный геометризм'
+  },
+  [ArtStyle.SAMURAI]: {
+    emoji: '⚔️',
+    bgClass: 'bg-gradient-to-br from-gray-200 via-red-100 to-gray-200',
+    darkText: true,
+    description: 'Японская тушь и воины'
   }
 };
 
