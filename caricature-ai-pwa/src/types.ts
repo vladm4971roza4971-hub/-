@@ -107,8 +107,6 @@ export enum Tool {
 
 export type AIProvider = 'gemini' | 'openai' | 'stability' | 'huggingface' | 'pollinations';
 
-export type ImageSize = string;
-
 export interface GeneratedImage {
   imageUrl: string;
   prompt: string;
@@ -144,4 +142,20 @@ export interface AppSettings {
   provider: AIProvider;
   apiKey: string;
   baseUrl?: string;
+}
+
+// --- NEW INTERFACES FOR SAVED KEYS ---
+export interface SavedCredential {
+  id: string;
+  provider: AIProvider;
+  alias: string;
+  key: string;
+  createdAt: number;
+}
+
+export interface SavedProxy {
+  id: string;
+  alias: string;
+  url: string;
+  createdAt: number;
 }
