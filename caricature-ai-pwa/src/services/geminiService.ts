@@ -28,6 +28,40 @@ const createGeminiClient = (apiKey: string, baseUrl?: string) => {
     return new GoogleGenAI(options);
 };
 
+export const checkProxyConnection = async (baseUrl: string): Promise<boolean> => {
+    try {
+        // Try to fetch models using the proxy. 
+        // If it's a Gemini proxy, it might require a key even for basic check, so we can try a fetch that might return 400 or 401.
+        // A 404/Connection Refused means the proxy itself is unreachable.
+        // A 401/403/400 means the proxy *was* reached but the request was invalid (which means connectivity is OK).
+        const url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        
+        // Attempt a fetch to a common endpoint. 
+        // We set a short timeout because we just want to see if the network layer works.
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        try {
+            const res = await fetch(`${url}/models`, { 
+                method: 'GET',
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            // If we get a response (even error), the proxy is reachable.
+            return true;
+        } catch (e: any) {
+            clearTimeout(timeoutId);
+            // If it's a network error/aborted, it's failed.
+            // If the proxy returns 404 for this endpoint, it's still "connected".
+            // However, typically fetch throws on network failure.
+            console.error("Proxy check failed:", e);
+            return false;
+        }
+    } catch (e) {
+        return false;
+    }
+};
+
 export const validateApiKey = async (settings: AppSettings): Promise<boolean> => {
   try {
     if (settings.provider === 'pollinations') {
