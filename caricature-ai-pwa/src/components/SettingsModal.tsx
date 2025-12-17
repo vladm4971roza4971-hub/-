@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
-import { validateApiKey } from '../services/geminiService';
-import { AppSettings, AIProvider } from '../types';
+import { validateApiKey, checkProxyConnection } from '../services/geminiService';
+import { AppSettings, AIProvider, SavedCredential, SavedProxy } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,8 +15,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   
+  // Library State
+  const [savedKeys, setSavedKeys] = useState<SavedCredential[]>([]);
+  const [savedProxies, setSavedProxies] = useState<SavedProxy[]>([]);
+  
+  // UI State
+  const [showKeyLibrary, setShowKeyLibrary] = useState(false);
+  const [showProxyLibrary, setShowProxyLibrary] = useState(false);
+  const [aliasInput, setAliasInput] = useState('');
+  const [proxyAliasInput, setProxyAliasInput] = useState('');
+
+  // Status
   const [status, setStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  
+  const [proxyStatus, setProxyStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  const [proxyMsg, setProxyMsg] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -29,129 +43,329 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         setApiKey('');
         setBaseUrl('');
       }
+      
+      // Load libraries
+      const keys = JSON.parse(localStorage.getItem('saved_credentials') || '[]');
+      const proxies = JSON.parse(localStorage.getItem('saved_proxies') || '[]');
+      setSavedKeys(keys);
+      setSavedProxies(proxies);
+      
       setStatus('idle');
       setStatusMsg('');
+      setProxyStatus('idle');
+      setProxyMsg('');
+      setShowKeyLibrary(false);
+      setShowProxyLibrary(false);
     }
   }, [isOpen, currentSettings]);
 
-  const handleSave = async () => {
-    if (provider !== 'pollinations' && !apiKey.trim()) {
-      onSettingsChange(null);
-      onClose();
-      return;
-    }
+  // --- KEY LOGIC ---
 
-    setStatus('checking');
-    setStatusMsg('Проверяем доступ...');
-
-    const settingsToValidate: AppSettings = {
+  const handleSaveKeyToLibrary = () => {
+    if (!apiKey.trim() || !aliasInput.trim()) return;
+    const newKey: SavedCredential = {
+        id: Date.now().toString(),
         provider,
-        apiKey: apiKey.trim(),
-        baseUrl: baseUrl.trim() || undefined
+        alias: aliasInput.trim(),
+        key: apiKey.trim(),
+        createdAt: Date.now()
     };
-
-    const isValid = await validateApiKey(settingsToValidate);
-
-    if (isValid) {
-      setStatus('valid');
-      setStatusMsg('Успешно подключено!');
-      onSettingsChange(settingsToValidate);
-      setTimeout(onClose, 1000);
-    } else {
-      setStatus('invalid');
-      setStatusMsg('Ошибка проверки. Проверьте ключ или Интернет.');
-    }
+    const updated = [...savedKeys, newKey];
+    setSavedKeys(updated);
+    localStorage.setItem('saved_credentials', JSON.stringify(updated));
+    setAliasInput('');
+    setShowKeyLibrary(true); // Switch to list view to confirm
   };
 
-  const handleClear = () => {
-    setApiKey('');
-    setBaseUrl('');
-    onSettingsChange(null);
-    onClose();
+  const handleDeleteKey = (id: string) => {
+    if(!window.confirm("Удалить этот ключ?")) return;
+    const updated = savedKeys.filter(k => k.id !== id);
+    setSavedKeys(updated);
+    localStorage.setItem('saved_credentials', JSON.stringify(updated));
+  };
+
+  const handleSelectKey = (key: string) => {
+      setApiKey(key);
+      setShowKeyLibrary(false);
+      setStatus('idle');
+  };
+
+  const checkKey = async () => {
+      if (!apiKey) return;
+      setStatus('checking');
+      setStatusMsg('Проверка ключа...');
+      
+      const isValid = await validateApiKey({ provider, apiKey, baseUrl: baseUrl || undefined });
+      if (isValid) {
+          setStatus('valid');
+          setStatusMsg('✅ Ключ работает!');
+      } else {
+          setStatus('invalid');
+          setStatusMsg('❌ Ошибка проверки. Неверный ключ или проблемы с сетью.');
+      }
+  };
+
+  // --- PROXY LOGIC ---
+
+  const handleSaveProxyToLibrary = () => {
+      if (!baseUrl.trim() || !proxyAliasInput.trim()) return;
+      const newProxy: SavedProxy = {
+          id: Date.now().toString(),
+          alias: proxyAliasInput.trim(),
+          url: baseUrl.trim(),
+          createdAt: Date.now()
+      };
+      const updated = [...savedProxies, newProxy];
+      setSavedProxies(updated);
+      localStorage.setItem('saved_proxies', JSON.stringify(updated));
+      setProxyAliasInput('');
+      setShowProxyLibrary(true);
+  };
+
+  const handleDeleteProxy = (id: string) => {
+      if(!window.confirm("Удалить этот прокси?")) return;
+      const updated = savedProxies.filter(p => p.id !== id);
+      setSavedProxies(updated);
+      localStorage.setItem('saved_proxies', JSON.stringify(updated));
+  };
+
+  const handleSelectProxy = (url: string) => {
+      setBaseUrl(url);
+      setShowProxyLibrary(false);
+      setProxyStatus('idle');
+  };
+
+  const checkProxy = async () => {
+      if (!baseUrl) return;
+      setProxyStatus('checking');
+      setProxyMsg('Пинг...');
+      
+      const isAlive = await checkProxyConnection(baseUrl);
+      if (isAlive) {
+          setProxyStatus('valid');
+          setProxyMsg('✅ Прокси доступен (200 OK)');
+      } else {
+          setProxyStatus('invalid');
+          setProxyMsg('❌ Прокси недоступен или ошибка CORS');
+      }
+  };
+
+  // --- GENERAL ---
+
+  const handleApply = () => {
+      if (provider !== 'pollinations' && !apiKey.trim()) {
+        onSettingsChange(null);
+        onClose();
+        return;
+      }
+      const settings: AppSettings = {
+          provider,
+          apiKey: apiKey.trim(),
+          baseUrl: baseUrl.trim() || undefined
+      };
+      onSettingsChange(settings);
+      onClose();
   };
 
   const getProviderInfo = (p: AIProvider) => {
       switch(p) {
-          case 'gemini': return { icon: '✨', name: 'Google Gemini', desc: 'Лучшее качество. Видит фото. Лимиты на бесплатном тарифе.', hasFree: true, needsKey: true };
-          case 'openai': return { icon: '🧠', name: 'OpenAI DALL-E', desc: 'Мощный, но платный. Игнорирует фото (только текст).', hasFree: false, needsKey: true };
-          case 'stability': return { icon: '🎨', name: 'Stability AI', desc: 'Отлично обрабатывает фото (Img2Img). Платный.', hasFree: false, needsKey: true };
-          case 'huggingface': return { icon: '🤗', name: 'Hugging Face', desc: 'Бесплатный токен. Видит фото (InstructPix2Pix).', hasFree: true, needsKey: true };
-          case 'pollinations': return { icon: '🌸', name: 'Pollinations', desc: 'Бесплатно. Рисует с нуля (игнорирует фото). Лучше понимает английский.', hasFree: true, needsKey: false };
+          case 'gemini': return { icon: '✨', name: 'Google Gemini', needsKey: true };
+          case 'openai': return { icon: '🧠', name: 'OpenAI', needsKey: true };
+          case 'stability': return { icon: '🎨', name: 'Stability AI', needsKey: true };
+          case 'huggingface': return { icon: '🤗', name: 'Hugging Face', needsKey: true };
+          case 'pollinations': return { icon: '🌸', name: 'Pollinations', needsKey: false };
       }
   };
 
-  if (!isOpen) return null;
-
   const currentInfo = getProviderInfo(provider);
+  const relevantKeys = savedKeys.filter(k => k.provider === provider);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in" style={{ touchAction: 'none' }}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl scale-100 relative max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-          ⚙️ Настройки Сервиса
-        </h3>
+      <div className="bg-white rounded-2xl p-0 w-full max-w-md shadow-2xl scale-100 flex flex-col max-h-[90vh]">
         
-        <div className="space-y-4">
-          
-          <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Выберите сервис</label>
-              <div className="grid grid-cols-3 gap-2">
-                  {(['gemini', 'huggingface', 'pollinations', 'stability', 'openai'] as AIProvider[]).map(p => {
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">⚙️ Настройки</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-dark">✕</button>
+        </div>
+
+        <div className="p-6 overflow-y-auto space-y-6">
+            
+            {/* Provider Selection */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Сервис генерации</label>
+              <div className="grid grid-cols-5 gap-2">
+                  {(['gemini', 'openai', 'stability', 'huggingface', 'pollinations'] as AIProvider[]).map(p => {
                       const info = getProviderInfo(p);
                       return (
                           <button
                             key={p}
                             onClick={() => { setProvider(p); setStatus('idle'); setStatusMsg(''); }}
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all min-h-[70px] ${provider === p ? 'border-secondary bg-secondary/5 ring-1 ring-secondary' : 'border-gray-100 hover:border-gray-300'}`}
+                            className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all h-[60px] ${provider === p ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-300'}`}
+                            title={info.name}
                           >
-                              <span className="text-xl mb-1">{info.icon}</span>
-                              <span className="text-[9px] font-bold text-gray-600 leading-tight text-center">{info.name}</span>
+                              <span className="text-xl">{info.icon}</span>
                           </button>
                       );
                   })}
               </div>
-              <div className="mt-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{currentInfo.icon}</span>
-                      <span className="font-bold text-sm text-gray-800">{currentInfo.name}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                      {currentInfo.desc}
-                  </p>
-                  {!currentInfo.needsKey && <p className="text-xs text-green-600 font-bold mt-1">✅ Ключ не требуется!</p>}
-                  {provider === 'pollinations' && <p className="text-xs text-orange-500 font-bold mt-1">⚠️ Работает только по тексту (фото игнорируется)</p>}
-                  {provider === 'huggingface' && <div className="mt-2 bg-blue-50 p-2 rounded-lg border border-blue-100"><p className="text-[10px] text-blue-600 font-bold mb-1">Как создать токен:</p><p className="text-[10px] text-blue-500 leading-tight">1. Выберите тип <b>Fine-grained</b><br/>2. В разделе <b>User Permissions</b> найдите <b>Inference</b><br/>3. Отметьте галочку <b className="text-blue-700">Make calls to Inference Providers</b></p></div>}
-              </div>
-          </div>
-
-          {currentInfo.needsKey && (
-            <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">API Ключ</label>
-                <input type="password" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setStatus('idle'); setStatusMsg(''); }} placeholder={`Ключ для ${currentInfo.name}`} className={`w-full p-3 rounded-xl bg-gray-50 border outline-none transition-all ${status === 'invalid' ? 'border-red-400 bg-red-50' : status === 'valid' ? 'border-green-400 bg-green-50' : 'border-gray-200 focus:border-secondary focus:bg-white'}`} />
-                <div className="mt-2 text-right">
-                    {provider === 'gemini' && <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить ключ Google</a>}
-                    {provider === 'openai' && <a href="https://platform.openai.com/api-keys" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить ключ OpenAI</a>}
-                    {provider === 'stability' && <a href="https://platform.stability.ai/account/keys" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить ключ Stability</a>}
-                    {provider === 'huggingface' && <a href="https://huggingface.co/settings/tokens" target="_blank" className="text-[10px] text-blue-500 hover:underline font-bold bg-blue-50 px-2 py-1 rounded">Получить токен HF</a>}
-                </div>
+              <p className="text-center text-xs font-bold mt-2 text-gray-700">{currentInfo.name}</p>
             </div>
-          )}
-          
-          {provider !== 'pollinations' && (
-            <details className="group">
-                <summary className="text-xs font-bold text-gray-500 cursor-pointer hover:text-dark select-none list-none flex items-center gap-1"><span className="transform group-open:rotate-90 transition-transform">▶</span> Дополнительно (Proxy URL)</summary>
-                <div className="mt-2 pl-2 border-l-2 border-gray-100"><input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="w-full p-2 text-xs rounded-lg bg-gray-50 border border-gray-200 focus:border-secondary outline-none" /></div>
-            </details>
-          )}
 
-          {statusMsg && <p className={`text-xs mt-2 font-bold text-center animate-pulse ${status === 'valid' ? 'text-green-600' : status === 'invalid' ? 'text-red-500' : 'text-gray-500'}`}>{statusMsg}</p>}
+            {/* API Key Section */}
+            {currentInfo.needsKey && (
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase">API Ключ</label>
+                        <button onClick={() => setShowKeyLibrary(!showKeyLibrary)} className="text-xs text-primary font-bold hover:underline">
+                            {showKeyLibrary ? '← Ввести вручную' : '📚 Выбрать из сохраненных'}
+                        </button>
+                    </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={handleClear} className="flex-1 rounded-xl text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">Сбросить</Button>
-            <Button onClick={handleSave} isLoading={status === 'checking'} className="flex-1 rounded-xl">Сохранить</Button>
-          </div>
-          <Button onClick={onClose} variant="secondary" className="w-full mt-4 bg-gray-800 hover:bg-black shadow-none border-none text-white">Закрыть</Button>
+                    {!showKeyLibrary ? (
+                        <>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="password" 
+                                    value={apiKey} 
+                                    onChange={(e) => { setApiKey(e.target.value); setStatus('idle'); }} 
+                                    placeholder="sk-..." 
+                                    className="flex-1 p-2 rounded-lg border outline-none text-sm font-mono"
+                                />
+                                <Button onClick={checkKey} isLoading={status === 'checking'} variant="secondary" className="px-3 py-1 text-xs">Проверить</Button>
+                            </div>
+                            
+                            {/* Save Key UI */}
+                            {apiKey && (
+                                <div className="mt-2 flex gap-2 items-center animate-fade-in">
+                                    <input 
+                                        type="text" 
+                                        value={aliasInput} 
+                                        onChange={e => setAliasInput(e.target.value)} 
+                                        placeholder="Название (напр. 'Мой Про')" 
+                                        className="flex-1 p-2 text-xs border-b bg-transparent outline-none"
+                                    />
+                                    <button onClick={handleSaveKeyToLibrary} disabled={!aliasInput} className="text-xs bg-dark text-white px-3 py-2 rounded-lg disabled:opacity-50">Сохранить</button>
+                                </div>
+                            )}
+                            
+                            {statusMsg && (
+                                <div className={`mt-2 text-xs font-bold p-2 rounded ${status === 'valid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {statusMsg}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="space-y-2">
+                            {relevantKeys.length === 0 ? (
+                                <p className="text-xs text-center text-gray-400 py-4">Нет сохраненных ключей для {currentInfo.name}</p>
+                            ) : (
+                                relevantKeys.map(k => (
+                                    <div key={k.id} className="flex items-center justify-between bg-white p-2 rounded border hover:border-primary cursor-pointer group" onClick={() => handleSelectKey(k.key)}>
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-sm text-gray-800">{k.alias}</span>
+                                            <span className="text-[10px] text-gray-400 font-mono">...{k.key.slice(-4)}</span>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteKey(k.id); }} className="p-2 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded">🗑️</button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Proxy Section */}
+            {provider !== 'pollinations' && (
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                     <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase">Proxy / Base URL</label>
+                        <button onClick={() => setShowProxyLibrary(!showProxyLibrary)} className="text-xs text-secondary font-bold hover:underline">
+                            {showProxyLibrary ? '← Ввести вручную' : '📚 Выбрать прокси'}
+                        </button>
+                    </div>
+
+                    {!showProxyLibrary ? (
+                        <>
+                             <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={baseUrl} 
+                                    onChange={(e) => { setBaseUrl(e.target.value); setProxyStatus('idle'); }} 
+                                    placeholder="https://..." 
+                                    className="flex-1 p-2 rounded-lg border outline-none text-sm"
+                                />
+                                <Button onClick={checkProxy} isLoading={proxyStatus === 'checking'} variant="outline" className="px-3 py-1 text-xs border-gray-300 text-gray-600">Тест</Button>
+                            </div>
+                            
+                            {/* Proxy Format Hint - Custom Styling per Request */}
+                            <div className="mt-3 text-[10px] text-gray-500 bg-blue-50 p-3 rounded-xl border border-blue-100 space-y-2">
+                              <p className="font-bold text-blue-700">📌 Как настроить прокси (формат URL):</p>
+                              
+                              <div className="grid grid-cols-1 gap-1 font-mono text-gray-600">
+                                <div><span className="font-bold text-gray-500">Пример 1:</span> http://123.45.67.89:8080</div>
+                                <div><span className="font-bold text-gray-500">Пример 2:</span> http://user:pass@123.45.67.89:8080</div>
+                              </div>
+                              
+                              <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-x-2 gap-y-1">
+                                <div className="flex justify-between"><span>IP прокси:</span> <span className="font-bold">123.45.67.89</span></div>
+                                <div className="flex justify-between"><span>Порт:</span> <span className="font-bold">8080</span></div>
+                                <div className="col-span-2 flex justify-between"><span>Тип:</span> <span className="font-bold">http:// или https://</span></div>
+                                <div className="col-span-2 border-t border-blue-200 mt-1 pt-1 text-xs opacity-75">
+                                  Логин/пароль — указывать перед IP через @
+                                </div>
+                              </div>
+                            </div>
+
+                             {baseUrl && (
+                                <div className="mt-2 flex gap-2 items-center animate-fade-in">
+                                    <input 
+                                        type="text" 
+                                        value={proxyAliasInput} 
+                                        onChange={e => setProxyAliasInput(e.target.value)} 
+                                        placeholder="Название (напр. 'Домашний')" 
+                                        className="flex-1 p-2 text-xs border-b bg-transparent outline-none"
+                                    />
+                                    <button onClick={handleSaveProxyToLibrary} disabled={!proxyAliasInput} className="text-xs bg-gray-600 text-white px-3 py-2 rounded-lg disabled:opacity-50">Сохранить</button>
+                                </div>
+                            )}
+
+                             {proxyMsg && (
+                                <div className={`mt-2 text-xs font-bold p-2 rounded ${proxyStatus === 'valid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {proxyMsg}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="space-y-2">
+                            {savedProxies.length === 0 ? (
+                                <p className="text-xs text-center text-gray-400 py-4">Нет сохраненных прокси</p>
+                            ) : (
+                                savedProxies.map(p => (
+                                    <div key={p.id} className="flex items-center justify-between bg-white p-2 rounded border hover:border-secondary cursor-pointer" onClick={() => handleSelectProxy(p.url)}>
+                                        <div className="flex flex-col overflow-hidden">
+                                            <span className="font-bold text-sm text-gray-800">{p.alias}</span>
+                                            <span className="text-[10px] text-gray-400 truncate w-40">{p.url}</span>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteProxy(p.id); }} className="p-2 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded">🗑️</button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex gap-3">
+            <Button variant="outline" onClick={() => { onSettingsChange(null); onClose(); }} className="flex-1 text-xs">Сбросить</Button>
+            <Button onClick={handleApply} className="flex-[2]">Применить</Button>
+        </div>
+
       </div>
     </div>
   );
