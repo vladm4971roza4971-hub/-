@@ -65,7 +65,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       if (!url) return '';
       
       // 1. If user pasted "IP Port" (space or tab separated), replace with colon
-      // Regex looks for: digits.digits... space digits
       if (!url.includes('://') && url.match(/^[\d\.]+\s+\d+$/)) {
           url = url.replace(/\s+/, ':');
       }
@@ -93,7 +92,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setSavedKeys(updated);
     localStorage.setItem('saved_credentials', JSON.stringify(updated));
     setAliasInput('');
-    setShowKeyLibrary(true); // Switch to list view to confirm
+    setShowKeyLibrary(true);
   };
 
   const handleDeleteKey = (id: string) => {
@@ -165,18 +164,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       if (!baseUrl) return;
       
       const fixedUrl = normalizeProxyUrl(baseUrl);
-      setBaseUrl(fixedUrl); // Update UI with corrected URL
+      setBaseUrl(fixedUrl);
 
       setProxyStatus('checking');
       setProxyMsg('Пинг...');
       
-      const isAlive = await checkProxyConnection(fixedUrl);
-      if (isAlive) {
+      const result = await checkProxyConnection(fixedUrl);
+      if (result.ok) {
           setProxyStatus('valid');
-          setProxyMsg('✅ Прокси доступен (200 OK)');
+          setProxyMsg('✅ Прокси доступен');
       } else {
           setProxyStatus('invalid');
-          setProxyMsg('❌ Прокси недоступен или ошибка CORS');
+          setProxyMsg(`❌ ${result.message || 'Ошибка подключения'}`);
       }
   };
 
@@ -334,23 +333,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                                 <Button onClick={checkProxy} isLoading={proxyStatus === 'checking'} variant="outline" className="px-3 py-1 text-xs border-gray-300 text-gray-600">Тест</Button>
                             </div>
                             
-                            {/* Proxy Format Hint - Custom Styling per Request */}
-                            <div className="mt-3 text-[10px] text-gray-500 bg-blue-50 p-3 rounded-xl border border-blue-100 space-y-2">
-                              <p className="font-bold text-blue-700">📌 Как настроить прокси (формат URL):</p>
-                              
-                              <div className="grid grid-cols-1 gap-1 font-mono text-gray-600">
-                                <div><span className="font-bold text-gray-500">Пример 1:</span> http://123.45.67.89:8080</div>
-                                <div><span className="font-bold text-gray-500">Пример 2:</span> http://user:pass@123.45.67.89:8080</div>
-                              </div>
-                              
-                              <div className="pt-2 border-t border-blue-200 grid grid-cols-2 gap-x-2 gap-y-1">
-                                <div className="flex justify-between"><span>IP прокси:</span> <span className="font-bold">123.45.67.89</span></div>
-                                <div className="flex justify-between"><span>Порт:</span> <span className="font-bold">8080</span></div>
-                                <div className="col-span-2 flex justify-between"><span>Тип:</span> <span className="font-bold">http:// или https://</span></div>
-                                <div className="col-span-2 border-t border-blue-200 mt-1 pt-1 text-xs opacity-75">
-                                  Логин/пароль — указывать перед IP через @
-                                </div>
-                              </div>
+                            {/* Detailed Proxy Warning */}
+                             <div className="mt-3 text-[10px] bg-yellow-50 p-3 rounded-xl border border-yellow-200 space-y-2">
+                              <p className="font-bold text-yellow-800">⚠️ Важно:</p>
+                              <p className="text-gray-600 leading-tight">
+                                Это поле для <strong>Reverse Proxy (API Gateway)</strong>. 
+                              </p>
+                              <p className="text-gray-600 leading-tight">
+                                Обычные анонимные прокси (IP:PORT) здесь <strong>не работают</strong>, так как браузеры блокируют прямые запросы к ним из-за безопасности (CORS).
+                              </p>
                             </div>
 
                              {baseUrl && (
