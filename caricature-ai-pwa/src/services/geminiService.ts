@@ -26,27 +26,44 @@ const createGeminiClient = (apiKey: string, baseUrl?: string) => {
     return new GoogleGenAI(options);
 };
 
-export const checkProxyConnection = async (baseUrl: string): Promise<boolean> => {
+// Returns object with status to provide better UI feedback
+export const checkProxyConnection = async (baseUrl: string): Promise<{ ok: boolean; code?: string; message?: string }> => {
     try {
         const url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         try {
-            // Attempt to fetch models endpoint which is common in OpenAI-compatible APIs
-            await fetch(`${url}/models`, { 
+            // We use 'no-cors' mode to detect if server exists even if it doesn't allow CORS.
+            // However, 'no-cors' returns an opaque response which we can't read status from.
+            // So we try standard fetch first.
+            const response = await fetch(`${url}/models`, { 
                 method: 'GET',
-                signal: controller.signal
+                signal: controller.signal,
+                headers: { 'Content-Type': 'application/json' }
             });
+            
             clearTimeout(timeoutId);
-            return true;
+            
+            if (response.ok) return { ok: true };
+            return { ok: false, code: response.status.toString(), message: `Сервер ответил ошибкой ${response.status}` };
+
         } catch (e: any) {
             clearTimeout(timeoutId);
-            console.error("Proxy check failed:", e);
-            return false;
+            const errString = e.toString().toLowerCase();
+            
+            if (e.name === 'AbortError') {
+                return { ok: false, code: 'TIMEOUT', message: 'Тайм-аут: сервер не отвечает' };
+            }
+            if (errString.includes('failed to fetch')) {
+                // This is the tricky part: standard browsers return "Failed to fetch" for both 
+                // Network Down AND CORS errors. We can't distinguish 100% via JS code due to security.
+                return { ok: false, code: 'CORS_OR_NETWORK', message: 'Ошибка сети или CORS (Браузер заблокировал запрос)' };
+            }
+            return { ok: false, code: 'UNKNOWN', message: e.message };
         }
-    } catch (e) {
-        return false;
+    } catch (e: any) {
+        return { ok: false, code: 'ERROR', message: e.message };
     }
 };
 
@@ -58,7 +75,6 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
     else if (settings.provider === 'gemini') {
         const ai = createGeminiClient(settings.apiKey, settings.baseUrl);
         // Use the EXACT same model as generation to test quotas correctly
-        // Asking for a simple text response from the image model
         await ai.models.generateContent({ 
             model: 'gemini-2.5-flash-image', 
             contents: 'test' 
@@ -130,7 +146,7 @@ const getFriendlyErrorMessage = (error: any): string => {
   if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен. Проверьте права API ключа (GCP Project).";
   if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Генерация заблокирована фильтром безопасности. Попробуйте другое фото или описание.";
   if (msg.includes('503') || msg.includes('Overloaded')) return "Сервис перегружен. Попробуйте через минуту.";
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Ошибка сети. Возможно, нужен VPN или Proxy URL в настройках.";
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Ошибка сети или CORS. Проверьте Proxy URL.";
   if (msg.includes('finishReason')) return `Модель завершила работу с причиной: ${msg}`;
   return `Произошла ошибка: ${msg.slice(0, 100)}...`;
 };
@@ -222,7 +238,7 @@ const generateWithPollinations = async (style: ArtStyle, customPrompt: string) =
     return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result as string); reader.onerror = reject; reader.readAsDataURL(blob); });
 };
 
-// --- DUMMY HANDLERS FOR OTHER PROVIDERS TO KEEP CODE VALID BUT SIMPLE ---
+// --- DUMMY HANDLERS ---
 const generateWithStability = async (apiKey: string, mainImageBase64: string, style: ArtStyle, customPrompt: string, baseUrl: string = 'https://api.stability.ai') => {
    throw new Error("Stability implementation temporarily simplified for fix.");
 };
