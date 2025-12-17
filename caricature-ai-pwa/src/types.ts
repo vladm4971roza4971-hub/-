@@ -58,6 +58,7 @@ export enum ArtStyle {
   BAUHAUS = 'Баухаус',
   SAMURAI = 'Самурай',
   
+  // --- NEW ADDITIONS ---
   CUTE_CREATURE = 'Милашка',
   FUTURE_ARCH = 'Футуризм (Арх)',
   GOTHIC_ARCH = 'Готика (Арх)',
@@ -144,7 +145,6 @@ export interface AppSettings {
   baseUrl?: string;
 }
 
-// --- NEW INTERFACES FOR SAVED KEYS ---
 export interface SavedCredential {
   id: string;
   provider: AIProvider;
