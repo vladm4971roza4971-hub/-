@@ -59,6 +59,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     }
   }, [isOpen, currentSettings]);
 
+  // --- HELPER: Normalize Proxy URL ---
+  const normalizeProxyUrl = (input: string): string => {
+      let url = input.trim();
+      if (!url) return '';
+      
+      // 1. If user pasted "IP Port" (space or tab separated), replace with colon
+      // Regex looks for: digits.digits... space digits
+      if (!url.includes('://') && url.match(/^[\d\.]+\s+\d+$/)) {
+          url = url.replace(/\s+/, ':');
+      }
+
+      // 2. Add protocol if missing
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = `http://${url}`;
+      }
+      
+      return url;
+  };
+
   // --- KEY LOGIC ---
 
   const handleSaveKeyToLibrary = () => {
@@ -95,7 +114,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       setStatus('checking');
       setStatusMsg('Проверка ключа...');
       
-      const isValid = await validateApiKey({ provider, apiKey, baseUrl: baseUrl || undefined });
+      const fixedBaseUrl = baseUrl ? normalizeProxyUrl(baseUrl) : undefined;
+      if (fixedBaseUrl && fixedBaseUrl !== baseUrl) setBaseUrl(fixedBaseUrl);
+
+      const isValid = await validateApiKey({ provider, apiKey, baseUrl: fixedBaseUrl });
       if (isValid) {
           setStatus('valid');
           setStatusMsg('✅ Ключ работает!');
@@ -109,10 +131,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const handleSaveProxyToLibrary = () => {
       if (!baseUrl.trim() || !proxyAliasInput.trim()) return;
+      
+      const fixedUrl = normalizeProxyUrl(baseUrl);
+      setBaseUrl(fixedUrl);
+
       const newProxy: SavedProxy = {
           id: Date.now().toString(),
           alias: proxyAliasInput.trim(),
-          url: baseUrl.trim(),
+          url: fixedUrl,
           createdAt: Date.now()
       };
       const updated = [...savedProxies, newProxy];
@@ -137,10 +163,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const checkProxy = async () => {
       if (!baseUrl) return;
+      
+      const fixedUrl = normalizeProxyUrl(baseUrl);
+      setBaseUrl(fixedUrl); // Update UI with corrected URL
+
       setProxyStatus('checking');
       setProxyMsg('Пинг...');
       
-      const isAlive = await checkProxyConnection(baseUrl);
+      const isAlive = await checkProxyConnection(fixedUrl);
       if (isAlive) {
           setProxyStatus('valid');
           setProxyMsg('✅ Прокси доступен (200 OK)');
@@ -158,10 +188,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         onClose();
         return;
       }
+      
+      const fixedBaseUrl = baseUrl ? normalizeProxyUrl(baseUrl) : undefined;
+
       const settings: AppSettings = {
           provider,
           apiKey: apiKey.trim(),
-          baseUrl: baseUrl.trim() || undefined
+          baseUrl: fixedBaseUrl
       };
       onSettingsChange(settings);
       onClose();
