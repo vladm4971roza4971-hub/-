@@ -57,7 +57,12 @@ export const validateApiKey = async (settings: AppSettings): Promise<boolean> =>
     }
     else if (settings.provider === 'gemini') {
         const ai = createGeminiClient(settings.apiKey, settings.baseUrl);
-        await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: 'test' });
+        // Use the EXACT same model as generation to test quotas correctly
+        // Asking for a simple text response from the image model
+        await ai.models.generateContent({ 
+            model: 'gemini-2.5-flash-image', 
+            contents: 'test' 
+        });
         return true;
     } 
     else if (settings.provider === 'openai') {
@@ -120,7 +125,7 @@ const getBasePrompt = (style: ArtStyle) => {
 
 const getFriendlyErrorMessage = (error: any): string => {
   const msg = error.message || error.toString();
-  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Превышен лимит запросов Google. Попробуйте позже или смените ключ.";
+  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Лимит бесплатного ключа исчерпан (Quota). Попробуйте новый ключ или подождите.";
   if (msg.includes('401') || msg.includes('API key')) return "Неверный API ключ. Проверьте настройки.";
   if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен. Проверьте права API ключа (GCP Project).";
   if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Генерация заблокирована фильтром безопасности. Попробуйте другое фото или описание.";
