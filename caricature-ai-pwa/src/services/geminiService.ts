@@ -21,8 +21,6 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const createGeminiClient = (apiKey: string, baseUrl?: string) => {
     const options: any = { apiKey };
     if (baseUrl && baseUrl.trim().length > 0) {
-        // Ensure valid URL format or just pass string if SDK handles it, 
-        // usually SDK expects root without trailing slash, but let's sanitize slightly.
         options.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     }
     return new GoogleGenAI(options);
@@ -30,30 +28,20 @@ const createGeminiClient = (apiKey: string, baseUrl?: string) => {
 
 export const checkProxyConnection = async (baseUrl: string): Promise<boolean> => {
     try {
-        // Try to fetch models using the proxy. 
-        // If it's a Gemini proxy, it might require a key even for basic check, so we can try a fetch that might return 400 or 401.
-        // A 404/Connection Refused means the proxy itself is unreachable.
-        // A 401/403/400 means the proxy *was* reached but the request was invalid (which means connectivity is OK).
         const url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-        
-        // Attempt a fetch to a common endpoint. 
-        // We set a short timeout because we just want to see if the network layer works.
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         try {
-            const res = await fetch(`${url}/models`, { 
+            // Attempt to fetch models endpoint which is common in OpenAI-compatible APIs
+            await fetch(`${url}/models`, { 
                 method: 'GET',
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
-            // If we get a response (even error), the proxy is reachable.
             return true;
         } catch (e: any) {
             clearTimeout(timeoutId);
-            // If it's a network error/aborted, it's failed.
-            // If the proxy returns 404 for this endpoint, it's still "connected".
-            // However, typically fetch throws on network failure.
             console.error("Proxy check failed:", e);
             return false;
         }
@@ -153,7 +141,6 @@ const generateWithGemini = async (
     baseUrl?: string
 ) => {
     const ai = createGeminiClient(apiKey, baseUrl);
-    // ALWAYS use Flash Image
     const modelName = 'gemini-2.5-flash-image';
     
     let prompt = getBasePrompt(style);
@@ -252,7 +239,6 @@ export const generateCaricature = async (
   
   if (!settings && process.env.API_KEY) {
       try {
-        // If we have an env key, we assume standard base URL
         return await generateWithGemini(process.env.API_KEY, mainImageBase64, style, customPrompt, referenceImages, mimeType);
       } catch (e) {
         throw new Error(getFriendlyErrorMessage(e));
