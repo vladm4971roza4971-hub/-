@@ -67,57 +67,75 @@ export const checkProxyConnection = async (baseUrl: string): Promise<{ ok: boole
     }
 };
 
-export const validateApiKey = async (settings: AppSettings): Promise<boolean> => {
+const getFriendlyErrorMessage = (error: any): string => {
+  const msg = error.message || error.toString();
+  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Лимит бесплатного ключа исчерпан (Quota 429).";
+  if (msg.includes('401') || msg.includes('API key')) return "Неверный API ключ (401).";
+  if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен (403). Проверьте настройки GCP.";
+  if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Блокировка безопасности.";
+  if (msg.includes('503') || msg.includes('Overloaded')) return "Сервис перегружен (503).";
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Ошибка сети. Возможно CORS или Mixed Content (HTTP прокси на HTTPS сайте).";
+  if (msg.includes('finishReason')) return `Причина остановки: ${msg}`;
+  return `Ошибка: ${msg.slice(0, 80)}`;
+};
+
+export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boolean; message?: string }> => {
   try {
     if (settings.provider === 'pollinations') {
-        return true; 
+        return { ok: true }; 
     }
     else if (settings.provider === 'gemini') {
         const ai = createGeminiClient(settings.apiKey, settings.baseUrl);
-        // Use the EXACT same model as generation to test quotas correctly
-        await ai.models.generateContent({ 
-            model: 'gemini-2.5-flash-image', 
-            contents: 'test' 
-        });
-        return true;
+        try {
+            // Use the EXACT same model as generation to test quotas correctly
+            await ai.models.generateContent({ 
+                model: 'gemini-2.5-flash-image', 
+                contents: 'test' 
+            });
+            return { ok: true };
+        } catch (e: any) {
+            return { ok: false, message: getFriendlyErrorMessage(e) };
+        }
     } 
     else if (settings.provider === 'openai') {
-        const baseUrl = settings.baseUrl || 'https://api.openai.com/v1';
-        const res = await fetch(`${baseUrl}/models`, {
-            headers: { 'Authorization': `Bearer ${settings.apiKey}` }
-        });
-        return res.ok;
+        try {
+            const baseUrl = settings.baseUrl || 'https://api.openai.com/v1';
+            const res = await fetch(`${baseUrl}/models`, {
+                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+            });
+            if (res.ok) return { ok: true };
+            return { ok: false, message: `Ошибка OpenAI: ${res.status}` };
+        } catch(e: any) {
+            return { ok: false, message: getFriendlyErrorMessage(e) };
+        }
     }
     else if (settings.provider === 'stability') {
-        const baseUrl = settings.baseUrl || 'https://api.stability.ai/v1';
-        const res = await fetch(`${baseUrl}/user/account`, {
-            headers: { 'Authorization': `Bearer ${settings.apiKey}` }
-        });
-        return res.ok;
+        try {
+            const baseUrl = settings.baseUrl || 'https://api.stability.ai/v1';
+            const res = await fetch(`${baseUrl}/user/account`, {
+                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+            });
+            if (res.ok) return { ok: true };
+            return { ok: false, message: `Ошибка Stability: ${res.status}` };
+        } catch (e: any) {
+            return { ok: false, message: getFriendlyErrorMessage(e) };
+        }
     }
     else if (settings.provider === 'huggingface') {
         try {
             const res = await fetch('https://huggingface.co/api/whoami-v2', {
                 headers: { 'Authorization': `Bearer ${settings.apiKey}` }
             });
-            if (res.ok) return true;
-        } catch (e) {
-            console.warn("HF fallback");
-        }
-        try {
-            const res = await fetch('https://api-inference.huggingface.co/status/timbrooks/instruct-pix2pix', {
-                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
-            });
-            if (res.status === 401) return false;
-            return true; 
-        } catch (e) {
-            return false;
+            if (res.ok) return { ok: true };
+            return { ok: false, message: `Ошибка HF: ${res.status}` };
+        } catch (e: any) {
+            return { ok: false, message: getFriendlyErrorMessage(e) };
         }
     }
-    return false;
-  } catch (e) {
+    return { ok: false, message: "Провайдер не поддерживается" };
+  } catch (e: any) {
     console.error("Validation error:", e);
-    return false;
+    return { ok: false, message: e.message };
   }
 };
 
@@ -137,18 +155,6 @@ const getBasePrompt = (style: ArtStyle) => {
     } else {
       return `Create a fun and artistic illustration based on the MAIN IMAGE in the style of ${stylePrompt}. Capture the essence and personality of the subject with a stylized, artistic approach.`;
     }
-};
-
-const getFriendlyErrorMessage = (error: any): string => {
-  const msg = error.message || error.toString();
-  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Лимит бесплатного ключа исчерпан (Quota). Попробуйте новый ключ или подождите.";
-  if (msg.includes('401') || msg.includes('API key')) return "Неверный API ключ. Проверьте настройки.";
-  if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен. Проверьте права API ключа (GCP Project).";
-  if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Генерация заблокирована фильтром безопасности. Попробуйте другое фото или описание.";
-  if (msg.includes('503') || msg.includes('Overloaded')) return "Сервис перегружен. Попробуйте через минуту.";
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Ошибка сети или CORS. Проверьте Proxy URL.";
-  if (msg.includes('finishReason')) return `Модель завершила работу с причиной: ${msg}`;
-  return `Произошла ошибка: ${msg.slice(0, 100)}...`;
 };
 
 // --- GEMINI HANDLER ---
