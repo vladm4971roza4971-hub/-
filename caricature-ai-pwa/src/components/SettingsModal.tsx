@@ -77,6 +77,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       return url;
   };
 
+  // Check for Mixed Content (HTTPS site calling HTTP proxy)
+  const isMixedContentError = (url: string): boolean => {
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+          if (url.startsWith('http:')) {
+              return true;
+          }
+      }
+      return false;
+  };
+
   // --- KEY LOGIC ---
 
   const handleSaveKeyToLibrary = () => {
@@ -92,7 +102,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     setSavedKeys(updated);
     localStorage.setItem('saved_credentials', JSON.stringify(updated));
     setAliasInput('');
-    setShowKeyLibrary(true);
+    setShowKeyLibrary(true); // Switch to list view to confirm
   };
 
   const handleDeleteKey = (id: string) => {
@@ -110,19 +120,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
   const checkKey = async () => {
       if (!apiKey) return;
+      
+      let fixedBaseUrl = undefined;
+      if (baseUrl) {
+          fixedBaseUrl = normalizeProxyUrl(baseUrl);
+          setBaseUrl(fixedBaseUrl);
+
+          if (isMixedContentError(fixedBaseUrl)) {
+              setStatus('invalid');
+              setStatusMsg('⛔ Ошибка Mixed Content: Нельзя использовать HTTP прокси на HTTPS сайте (Vercel). Нужен HTTPS прокси.');
+              return;
+          }
+      }
+
       setStatus('checking');
       setStatusMsg('Проверка ключа...');
       
-      const fixedBaseUrl = baseUrl ? normalizeProxyUrl(baseUrl) : undefined;
-      if (fixedBaseUrl && fixedBaseUrl !== baseUrl) setBaseUrl(fixedBaseUrl);
-
-      const isValid = await validateApiKey({ provider, apiKey, baseUrl: fixedBaseUrl });
-      if (isValid) {
+      const result = await validateApiKey({ provider, apiKey, baseUrl: fixedBaseUrl });
+      if (result.ok) {
           setStatus('valid');
           setStatusMsg('✅ Ключ работает!');
       } else {
           setStatus('invalid');
-          setStatusMsg('❌ Ошибка проверки. Неверный ключ или проблемы с сетью.');
+          setStatusMsg(`❌ ${result.message || 'Ошибка проверки'}`);
       }
   };
 
@@ -166,6 +186,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       const fixedUrl = normalizeProxyUrl(baseUrl);
       setBaseUrl(fixedUrl);
 
+      // MIXED CONTENT CHECK
+      if (isMixedContentError(fixedUrl)) {
+          setProxyStatus('invalid');
+          setProxyMsg('⛔ Mixed Content: HTTPS сайт не может работать с HTTP прокси.');
+          return;
+      }
+
       setProxyStatus('checking');
       setProxyMsg('Пинг...');
       
@@ -189,6 +216,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
       }
       
       const fixedBaseUrl = baseUrl ? normalizeProxyUrl(baseUrl) : undefined;
+      if (fixedBaseUrl && isMixedContentError(fixedBaseUrl)) {
+           alert("Нельзя сохранить HTTP прокси на HTTPS сайте. Это работать не будет.");
+           return;
+      }
 
       const settings: AppSettings = {
           provider,
@@ -338,9 +369,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                               <p className="font-bold text-yellow-800">⚠️ Важно:</p>
                               <p className="text-gray-600 leading-tight">
                                 Это поле для <strong>Reverse Proxy (API Gateway)</strong>. 
+                                Обычные IP:PORT прокси здесь <strong>не работают</strong> (CORS).
                               </p>
                               <p className="text-gray-600 leading-tight">
-                                Обычные анонимные прокси (IP:PORT) здесь <strong>не работают</strong>, так как браузеры блокируют прямые запросы к ним из-за безопасности (CORS).
+                                На HTTPS сайтах (Vercel) работают только <strong>HTTPS</strong> прокси.
                               </p>
                             </div>
 
