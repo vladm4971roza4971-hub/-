@@ -18,10 +18,19 @@ export const fileToBase64 = (file: File): Promise<string> => {
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Sanitize strings to prevent ISO-8859-1 header errors
+const sanitizeHeaderValue = (val: string): string => {
+  // Remove any characters that are not valid in HTTP headers (non-ISO-8859-1)
+  // and strip leading/trailing whitespace/newlines
+  return val.trim().replace(/[^\x00-\x7F]/g, "");
+};
+
 const createGeminiClient = (apiKey: string, baseUrl?: string) => {
-    const options: any = { apiKey };
+    const cleanKey = sanitizeHeaderValue(apiKey);
+    const options: any = { apiKey: cleanKey };
     if (baseUrl && baseUrl.trim().length > 0) {
-        options.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const cleanBase = baseUrl.trim();
+        options.baseUrl = cleanBase.endsWith('/') ? cleanBase.slice(0, -1) : cleanBase;
     }
     return new GoogleGenAI(options);
 };
@@ -29,14 +38,11 @@ const createGeminiClient = (apiKey: string, baseUrl?: string) => {
 // Returns object with status to provide better UI feedback
 export const checkProxyConnection = async (baseUrl: string): Promise<{ ok: boolean; code?: string; message?: string }> => {
     try {
-        const url = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const url = baseUrl.trim().endsWith('/') ? baseUrl.trim().slice(0, -1) : baseUrl.trim();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         try {
-            // We use 'no-cors' mode to detect if server exists even if it doesn't allow CORS.
-            // However, 'no-cors' returns an opaque response which we can't read status from.
-            // So we try standard fetch first.
             const response = await fetch(`${url}/models`, { 
                 method: 'GET',
                 signal: controller.signal,
@@ -56,9 +62,7 @@ export const checkProxyConnection = async (baseUrl: string): Promise<{ ok: boole
                 return { ok: false, code: 'TIMEOUT', message: 'Тайм-аут: сервер не отвечает' };
             }
             if (errString.includes('failed to fetch')) {
-                // This is the tricky part: standard browsers return "Failed to fetch" for both 
-                // Network Down AND CORS errors. We can't distinguish 100% via JS code due to security.
-                return { ok: false, code: 'CORS_OR_NETWORK', message: 'Ошибка сети или CORS (Браузер заблокировал запрос)' };
+                return { ok: false, code: 'CORS_OR_NETWORK', message: 'Ошибка сети. Нужен VPN или HTTPS Proxy.' };
             }
             return { ok: false, code: 'UNKNOWN', message: e.message };
         }
@@ -69,28 +73,32 @@ export const checkProxyConnection = async (baseUrl: string): Promise<{ ok: boole
 
 const getFriendlyErrorMessage = (error: any): string => {
   const msg = error.message || error.toString();
-  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Лимит бесплатного ключа исчерпан (Quota 429).";
+  if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED')) return "Лимит ключа исчерпан (Quota 429).";
   if (msg.includes('401') || msg.includes('API key')) return "Неверный API ключ (401).";
-  if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен (403). Проверьте настройки GCP.";
+  if (msg.includes('403') || msg.includes('permission')) return "Доступ запрещен (403). Проверьте права ключа.";
   if (msg.includes('SAFETY') || msg.includes('HARM') || msg.includes('blocked')) return "Блокировка безопасности.";
   if (msg.includes('503') || msg.includes('Overloaded')) return "Сервис перегружен (503).";
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Ошибка сети. Возможно CORS или Mixed Content (HTTP прокси на HTTPS сайте).";
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return "Нет доступа к Google API. Включите VPN!";
+  if (msg.includes('append') && msg.includes('Headers')) return "Ошибка в символах ключа. Проверьте, нет ли русских букв или пробелов.";
   if (msg.includes('finishReason')) return `Причина остановки: ${msg}`;
   return `Ошибка: ${msg.slice(0, 80)}`;
 };
 
 export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boolean; message?: string }> => {
   try {
+    const cleanKey = sanitizeHeaderValue(settings.apiKey);
+    const cleanBaseUrl = settings.baseUrl ? sanitizeHeaderValue(settings.baseUrl) : undefined;
+
     if (settings.provider === 'pollinations') {
         return { ok: true }; 
     }
     else if (settings.provider === 'gemini') {
-        const ai = createGeminiClient(settings.apiKey, settings.baseUrl);
+        const ai = createGeminiClient(cleanKey, cleanBaseUrl);
         try {
-            // Use the EXACT same model as generation to test quotas correctly
+            // Simple ping with text model
             await ai.models.generateContent({ 
-                model: 'gemini-2.5-flash-image', 
-                contents: 'test' 
+                model: 'gemini-3-flash-preview', 
+                contents: 'Hi' 
             });
             return { ok: true };
         } catch (e: any) {
@@ -99,9 +107,9 @@ export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boole
     } 
     else if (settings.provider === 'openai') {
         try {
-            const baseUrl = settings.baseUrl || 'https://api.openai.com/v1';
+            const baseUrl = cleanBaseUrl || 'https://api.openai.com/v1';
             const res = await fetch(`${baseUrl}/models`, {
-                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+                headers: { 'Authorization': `Bearer ${cleanKey}` }
             });
             if (res.ok) return { ok: true };
             return { ok: false, message: `Ошибка OpenAI: ${res.status}` };
@@ -111,9 +119,9 @@ export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boole
     }
     else if (settings.provider === 'stability') {
         try {
-            const baseUrl = settings.baseUrl || 'https://api.stability.ai/v1';
+            const baseUrl = cleanBaseUrl || 'https://api.stability.ai/v1';
             const res = await fetch(`${baseUrl}/user/account`, {
-                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+                headers: { 'Authorization': `Bearer ${cleanKey}` }
             });
             if (res.ok) return { ok: true };
             return { ok: false, message: `Ошибка Stability: ${res.status}` };
@@ -124,7 +132,7 @@ export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boole
     else if (settings.provider === 'huggingface') {
         try {
             const res = await fetch('https://huggingface.co/api/whoami-v2', {
-                headers: { 'Authorization': `Bearer ${settings.apiKey}` }
+                headers: { 'Authorization': `Bearer ${cleanKey}` }
             });
             if (res.ok) return { ok: true };
             return { ok: false, message: `Ошибка HF: ${res.status}` };
@@ -135,7 +143,7 @@ export const validateApiKey = async (settings: AppSettings): Promise<{ ok: boole
     return { ok: false, message: "Провайдер не поддерживается" };
   } catch (e: any) {
     console.error("Validation error:", e);
-    return { ok: false, message: e.message };
+    return { ok: false, message: getFriendlyErrorMessage(e) };
   }
 };
 
